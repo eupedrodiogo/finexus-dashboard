@@ -184,60 +184,24 @@ export default function App() {
       migrateCategory(monthData.investments);
     });
 
-    // Reference: March 2026 logic requested by user
+    // Reference: March 2026 logic
     const marchKey = Object.keys(migratedData).find(k => k.includes('2026') && k.includes('03')) || '2026 -03 ';
-    const marchData = migratedData[marchKey];
+    
+    // One-time cleanup: Delete months after March 2026 as requested by user
+    Object.keys(migratedData).forEach(monthKey => {
+      const match = monthKey.match(/(\d{4}) -(\d{2}) /);
+      if (match) {
+        const year = parseInt(match[1]);
+        const month = parseInt(match[2]);
+        if (year > 2026 || (year === 2026 && month > 3)) {
+          delete migratedData[monthKey];
+          hasChanges = true;
+        }
+      }
+    });
 
+    const marchData = migratedData[marchKey];
     if (marchData) {
-      const categoriesToCopy = ['payslipIncome', 'basicExpenses', 'additionalVariableCosts', 'investments'] as const;
-      
-      categoriesToCopy.forEach(cat => {
-        const categoryData = marchData[cat] as any;
-        if (categoryData?.subCategories) {
-          categoryData.subCategories.forEach((sub: any) => {
-            sub.items.forEach((item: any) => {
-              if (item && !item.isRecurring) {
-                item.isRecurring = true;
-                hasChanges = true;
-              }
-            });
-          });
-        }
-      });
-      
-      Object.keys(migratedData).forEach(monthKey => {
-        if (monthKey !== marchKey) {
-          categoriesToCopy.forEach(cat => {
-            if (marchData[cat]) {
-              // Deep clone the reference category
-              const clonedCat = JSON.parse(JSON.stringify(marchData[cat]));
-              
-              if (clonedCat?.subCategories) {
-                clonedCat.subCategories.forEach((sub: any) => {
-                  sub.items.forEach((item: any) => {
-                    // Update dates to match the new month if applicable
-                    if (item.date && typeof item.date === 'string') {
-                       // monthKey might be "YYYY -MM "
-                       const yearMatch = monthKey.match(/(\d{4})/);
-                       const monthMatch = monthKey.match(/-(\d{2})/);
-                       if (yearMatch && monthMatch) {
-                          item.date = `${yearMatch[1]}-${monthMatch[1]}-01`;
-                       }
-                    } else {
-                      const yearMatch = monthKey.match(/(\d{4})/);
-                      const monthMatch = monthKey.match(/-(\d{2})/);
-                      item.date = (yearMatch && monthMatch) ? `${yearMatch[1]}-${monthMatch[1]}-01` : `${monthKey}-01`;
-                    }
-                  });
-                });
-              }
-              
-              (migratedData[monthKey] as any)[cat] = clonedCat;
-              hasChanges = true;
-            }
-          });
-        }
-      });
       
       // Migration: Extrato 12-02-2026 a 12-03-2026 PDF (Banco Inter)
       const marchDataObj = migratedData[marchKey];
