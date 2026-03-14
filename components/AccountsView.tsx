@@ -139,7 +139,7 @@ export const AccountsView: React.FC<AccountsViewProps> = ({ data, onUpdate, isMo
     };
 
     return (
-        <div className={`p-6 ${isMobile ? 'pb-24' : ''} max-w-7xl mx-auto animate-fadeIn`}>
+        <div className={`p-6 ${isMobile ? 'pb-24' : ''} max-w-[1600px] mx-auto animate-fadeIn`}>
             <header className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">

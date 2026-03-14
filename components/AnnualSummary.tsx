@@ -109,7 +109,7 @@ export const AnnualSummary: React.FC<AnnualSummaryProps> = ({ allData, currentYe
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      <main className="space-y-8 max-w-7xl mx-auto">
+      <main className="space-y-8 max-w-[1600px] mx-auto">
         {/* Chart Section */}
         <div className="p-6 rounded-xl shadow-sm bg-light-card dark:bg-dark-card border border-light-border dark:border-dark-border">
             <h2 className="text-xl font-bold text-center text-light-text dark:text-dark-text mb-4">

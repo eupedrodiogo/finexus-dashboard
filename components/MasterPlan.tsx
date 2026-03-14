@@ -86,7 +86,7 @@ export const MasterPlan: React.FC<MasterPlanProps> = ({ isDarkMode }) => {
   };
 
   return (
-    <div className={`w-full max-w-7xl mx-auto ${theme.bgMain} ${theme.shadowCard} transition-colors duration-300 animate-fadeIn`}>
+    <div className={`w-full max-w-[1600px] mx-auto ${theme.bgMain} ${theme.shadowCard} transition-colors duration-300 animate-fadeIn`}>
       {/* Cabeçalho */}
       <header className={`mb-6 border-b ${theme.headerBorder} pb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-colors`}>
         <div>

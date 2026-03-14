@@ -7,26 +7,34 @@ interface MonthNavigatorProps {
 }
 
 export const MonthNavigator: React.FC<MonthNavigatorProps> = ({ currentMonth, onPrevious, onNext }) => {
-  const monthName = currentMonth.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+  const monthName = currentMonth.toLocaleString('pt-BR', { month: 'long' });
+  const year = currentMonth.getFullYear();
 
   return (
-    <div className="flex items-center justify-center space-x-2">
+    <div className="flex items-center bg-white/50 dark:bg-slate-800/50 backdrop-blur-md rounded-2xl p-1.5 border border-slate-200 dark:border-slate-700 shadow-sm">
       <button
         onClick={onPrevious}
-        className="h-10 w-10 flex items-center justify-center bg-slate-200 dark:bg-slate-700 text-light-subtle dark:text-dark-subtle rounded-full hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        className="h-10 w-10 flex items-center justify-center bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-600 transition-all shadow-sm active:scale-95 group"
         aria-label="Mês anterior"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+        <span className="material-symbols-rounded notranslate group-hover:-translate-x-0.5 transition-transform">chevron_left</span>
       </button>
-      <span className="text-xl font-semibold text-light-text dark:text-dark-text w-48 text-center capitalize">
-        {monthName}
-      </span>
+      
+      <div className="px-6 flex flex-col items-center min-w-[180px]">
+        <span className="text-base font-black text-slate-800 dark:text-white capitalize leading-tight">
+          {monthName}
+        </span>
+        <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest leading-none">
+          {year}
+        </span>
+      </div>
+
       <button
         onClick={onNext}
-        className="h-10 w-10 flex items-center justify-center bg-slate-200 dark:bg-slate-700 text-light-subtle dark:text-dark-subtle rounded-full hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        className="h-10 w-10 flex items-center justify-center bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-600 transition-all shadow-sm active:scale-95 group"
         aria-label="Próximo mês"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" /></svg>
+        <span className="material-symbols-rounded notranslate group-hover:translate-x-0.5 transition-transform">chevron_right</span>
       </button>
     </div>
   );

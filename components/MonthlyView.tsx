@@ -144,16 +144,16 @@ export const MonthlyView: React.FC<MonthlyViewProps> = ({
             </div>
 
             {/* Month Summary Header (Sticky) */}
-            <div id="month-view-header" className="sticky top-0 z-30 bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col md:flex-row justify-center items-center gap-6 text-center">
+            <div id="month-view-header" className="sticky top-0 z-30 bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-slate-100 dark:border-slate-700 flex flex-col md:flex-row justify-around items-center gap-6">
                 {/* Embedded Month Navigator for Mobile/Sticky Context */}
-                <div className="w-full mb-4 border-b border-slate-100 dark:border-slate-700 pb-4 md:w-auto md:mb-0 md:border-b-0 md:pb-0">
+                <div className="w-full md:w-auto border-b border-slate-100 dark:border-slate-700 pb-4 md:border-b-0 md:pb-0">
                     <MonthNavigator
                         currentMonth={currentMonth}
                         onPrevious={onPreviousMonth}
                         onNext={onNextMonth}
                     />
                 </div>
-                <div className="flex gap-8 flex-wrap justify-center w-full md:w-auto mt-4 md:mt-0">
+                <div className="flex gap-10 flex-wrap justify-center md:flex-nowrap w-full md:w-auto mt-4 md:mt-0 px-4">
                     <div className="text-center">
                         <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Saldo Inicial</p>
                         <p className="text-xl font-bold text-slate-600 dark:text-slate-300">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totals.previousBalance || 0)}</p>

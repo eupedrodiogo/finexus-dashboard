@@ -22,7 +22,7 @@ const NavItem: React.FC<{
 }> = ({ active, onClick, icon, label, isOpen }) => (
   <button
     onClick={onClick}
-    className={`w-full flex items-center p-4 mb-3 rounded-2xl transition-all duration-300 group relative overflow-hidden
+    className={`w-full flex items-center ${isOpen ? 'p-4' : 'justify-center p-4'} mb-3 rounded-2xl transition-all duration-300 group relative overflow-hidden
       ${active
         ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-500/30 ring-1 ring-white/20'
         : 'text-slate-500 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/50 hover:text-indigo-600 dark:hover:text-indigo-400'
@@ -80,15 +80,34 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isO
 */ }
         </nav>
 
-        <div className="p-6 border-t border-slate-100 dark:border-white/5 space-y-4 bg-slate-50/30 dark:bg-slate-900/10">
-          <div className="flex gap-2">
-            <button onClick={toggleTheme} className="flex-1 flex items-center justify-center p-3 rounded-2xl bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all group" title="Alternar Tema">
-              <span className="material-symbols-rounded notranslate text-xl group-hover:rotate-180 transition-transform duration-500">{isDarkMode ? 'light_mode' : 'dark_mode'}</span>
-            </button>
-            <button onClick={onOpenSettings} className="flex-1 flex items-center justify-center p-3 rounded-2xl bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all group" title="Configurações">
-              <span className="material-symbols-rounded notranslate text-xl group-hover:rotate-90 transition-transform duration-500">settings</span>
-            </button>
-          </div>
+        <div className="p-6 border-t border-slate-100 dark:border-white/5 space-y-3 bg-slate-50/10 dark:bg-slate-900/10">
+          <button 
+            onClick={toggleTheme} 
+            className={`w-full flex items-center ${isOpen ? 'p-4' : 'justify-center p-4'} rounded-2xl transition-all duration-300 group
+              bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700`}
+            title="Alternar Tema"
+          >
+            <span className="material-symbols-rounded notranslate text-2xl group-hover:rotate-180 transition-transform duration-500">
+              {isDarkMode ? 'light_mode' : 'dark_mode'}
+            </span>
+            <span className={`ml-4 font-black text-sm tracking-tight whitespace-nowrap overflow-hidden transition-all duration-500 ${isOpen ? 'w-auto opacity-100' : 'w-0 opacity-0'}`}>
+              {isDarkMode ? 'Modo Claro' : 'Modo Escuro'}
+            </span>
+          </button>
+
+          <button 
+            onClick={onOpenSettings} 
+            className={`w-full flex items-center ${isOpen ? 'p-4' : 'justify-center p-4'} rounded-2xl transition-all duration-300 group
+              bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700`}
+            title="Configurações"
+          >
+            <span className="material-symbols-rounded notranslate text-2xl group-hover:rotate-90 transition-transform duration-500">
+              settings
+            </span>
+            <span className={`ml-4 font-black text-sm tracking-tight whitespace-nowrap overflow-hidden transition-all duration-500 ${isOpen ? 'w-auto opacity-100' : 'w-0 opacity-0'}`}>
+              Configurações
+            </span>
+          </button>
 
           {user ? (
             <div className="space-y-2">
