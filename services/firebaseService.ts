@@ -7,14 +7,25 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
-export const saveUserData = async (userId: string, data: any) => {
+export const saveUserData = async (userId: string, data: any, merge: boolean = true) => {
     try {
+        console.log(`[FirebaseService] 📤 Iniciando salvamento para: ${userId} (merge: ${merge})`);
         const userDocRef = doc(db, 'users', userId);
-        await setDoc(userDocRef, {
-            ...data,
-            updatedAt: new Date().toISOString()
-        }, { merge: true });
+        
+        const payloadString = JSON.stringify(data);
+        const payloadSizeKB = Math.round(payloadString.length / 1024);
+        console.log(`[FirebaseService] 📦 Tamanho do payload: ~${payloadSizeKB}KB`);
+
+        if (payloadSizeKB > 800) {
+            console.warn("[FirebaseService] ⚠️ AVISO: Payload aproximando-se do limite de 1MB do Firestore!");
+        }
+
+        // 'data' já deve conter 'updatedAt' vindo do App.tsx
+        await setDoc(userDocRef, data, { merge });
+        
+        console.log("[FirebaseService] ✅ Dados salvos com sucesso no Firestore.");
     } catch (error) {
+        console.error("[FirebaseService] ❌ Erro crítico ao salvar no Firestore:", error);
         throw error;
     }
 };
@@ -32,11 +43,9 @@ export const getUserData = async (userId: string) => {
     }
 };
 
-export const subscribeToUserData = (userId: string, callback: (data: any) => void) => {
+export const subscribeToUserData = (userId: string, callback: (doc: any) => void) => {
     const userDocRef = doc(db, 'users', userId);
     return onSnapshot(userDocRef, (doc) => {
-        if (doc.exists()) {
-            callback(doc.data());
-        }
+        callback(doc);
     });
 };

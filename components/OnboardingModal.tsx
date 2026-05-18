@@ -65,7 +65,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onClos
     };
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6 bg-slate-950/90 backdrop-blur-md animate-fadeIn pointer-events-auto">
             <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col md:flex-row h-full max-h-[600px] border border-slate-200 dark:border-slate-800">
 
                 {/* Image Section */}
@@ -91,8 +91,12 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onClos
                 {/* Content Section */}
                 <div className="flex-1 flex flex-col p-8 sm:p-12 relative h-full">
                     <button
-                        onClick={onClose}
-                        className="absolute top-6 right-6 p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition-colors"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            console.log("Onboarding: X clicked");
+                            onClose(false);
+                        }}
+                        className="absolute top-6 right-6 p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition-colors z-10"
                     >
                         <X className="w-5 h-5" />
                     </button>
@@ -113,7 +117,11 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onClos
 
                     <div className="mt-12 flex items-center justify-between">
                         <button
-                            onClick={() => onClose(false)}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                console.log("Onboarding: Pular clicked");
+                                onClose(false);
+                            }}
                             className="text-sm font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
                         >
                             Pular Tutorial
@@ -129,8 +137,12 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onClos
                             </button>
 
                             <button
-                                onClick={handleNext}
-                                className="flex items-center gap-2 px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl shadow-xl shadow-indigo-500/20 transition-all font-bold hover:scale-105 active:scale-95"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    console.log("Onboarding: Next/Start clicked");
+                                    handleNext();
+                                }}
+                                className="flex items-center gap-2 px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl shadow-xl shadow-indigo-500/20 transition-all font-bold hover:scale-105 active:scale-95 z-10"
                             >
                                 {currentStep === steps.length - 1 ? 'Começar Agora' : 'Próximo'}
                                 {currentStep < steps.length - 1 && <ChevronRight className="w-4 h-4" />}

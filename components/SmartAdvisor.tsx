@@ -144,7 +144,7 @@ export const SmartAdvisor: React.FC<SmartAdvisorProps> = ({ allData, onNavigateT
         
         **Dados Médios (Histórico):**
         - Renda Líquida Média: ${formatCurrency(financialContext.avgNet)}
-        - Custo de Vida Médio: ${formatCurrency(financialContext.avgExp)}
+        - Despesa Média Mensal: ${formatCurrency(financialContext.avgExp)}
         - Capacidade de Aporte Média (Investimentos + Saldo): ${formatCurrency(financialContext.avgInv + financialContext.avgBal)}
         
         **Estrutura do Relatório:**
@@ -230,7 +230,7 @@ export const SmartAdvisor: React.FC<SmartAdvisorProps> = ({ allData, onNavigateT
                     <circle className="text-slate-100 dark:text-slate-800" strokeWidth="8" stroke="currentColor" fill="transparent" r="42" cx="50" cy="50" />
                     <circle
                       className={`${analysis.healthScore > 70 ? 'text-emerald-500' : analysis.healthScore > 50 ? 'text-amber-500' : 'text-rose-500'
-                        } transition-all duration - 1000 ease - out`}
+                        } transition-all duration-1000 ease-out`}
                       strokeWidth="8"
                       strokeDasharray={263.8}
                       strokeDashoffset={263.8 - (263.8 * analysis.healthScore) / 100}
@@ -254,9 +254,9 @@ export const SmartAdvisor: React.FC<SmartAdvisorProps> = ({ allData, onNavigateT
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {analysis.insights.map((insight, i) => (
-                      <div key={i} className={`p - 5 rounded - 2xl border flex flex - col justify - between h - full ${insight.severity === 'high' ? 'bg-rose-50 dark:bg-rose-900/10 border-rose-100 dark:border-rose-800/30' : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700'} `}>
+                      <div key={i} className={`p-5 rounded-2xl border flex flex-col justify-between h-full ${insight.severity === 'high' ? 'bg-rose-50 dark:bg-rose-900/10 border-rose-100 dark:border-rose-800/30' : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700'}`}>
                         <div className="flex justify-between items-start mb-2">
-                          <span className={`text - [10px] font - black uppercase tracking - widest ${insight.severity === 'high' ? 'text-rose-600 dark:text-rose-400' : 'text-indigo-500'} `}>{insight.category}</span>
+                          <span className={`text-[10px] font-black uppercase tracking-widest ${insight.severity === 'high' ? 'text-rose-600 dark:text-rose-400' : 'text-indigo-500'}`}>{insight.category}</span>
                           {insight.severity === 'high' && <span className="material-symbols-rounded notranslate text-rose-500 text-lg">warning</span>}
                         </div>
                         <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{insight.message}</p>

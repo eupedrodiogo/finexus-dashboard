@@ -22,6 +22,15 @@ import { MobileNavigation } from './components/MobileNavigation';
 import { OnboardingModal } from './components/OnboardingModal';
 import { InterfaceTour, TourStep } from './components/InterfaceTour';
 
+// Restored Components
+import { CompactKPIBar } from './components/CompactKPIBar';
+import { TransactionFormScreen } from './components/TransactionFormScreen';
+import { SmartFinancialHealthCard } from './components/SmartFinancialHealthCard';
+import { SavingsCapacityCard } from './components/SavingsCapacityCard';
+import { SpendingEfficiencyCard } from './components/SpendingEfficiencyCard';
+import { AssetAllocation } from './components/AssetAllocation';
+import { ComparisonView } from './components/ComparisonView';
+
 const initialData: FinancialData = {
   payslipIncome: {
     id: 'payslipIncome',
@@ -145,6 +154,16 @@ export default function App() {
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isTourActive, setIsTourActive] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [transactionForm, setTransactionForm] = useState<{ isOpen: boolean, type?: 'expense' | 'income' | 'credit_card' | 'transfer' }>({ isOpen: false });
+  const [isFanOpen, setIsFanOpen] = useState(false);
+
+  // Scroll handler for Executive Header
+  useEffect(() => {
+    const handleScroll = () => setIsScrolled(window.scrollY > 40);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   useEffect(() => {
     const hasSeenOnboarding = localStorage.getItem('hasSeenOnboarding');
@@ -472,6 +491,18 @@ export default function App() {
 
   const currentMonthKey = getMonthKey(currentDate);
 
+  const normalizeAllData = (data: any) => {
+    if (!data) return {};
+    const normalized: any = {};
+    Object.keys(data).forEach(key => {
+      // Only keep keys that look like YYYY -MM (our month key format)
+      if (key.match(/^\d{4}\s*-\s*\d{2}/)) {
+        normalized[key] = data[key];
+      }
+    });
+    return normalized;
+  };
+
   // Initialize AllData from LocalStorage
   const [allData, setAllData] = useState<{ [key: string]: FinancialData }>(() => {
     if (typeof window !== 'undefined') {
@@ -490,7 +521,7 @@ export default function App() {
       const saved = localStorage.getItem('prosperaNexusAllData');
       if (saved) {
         try {
-          return JSON.parse(saved);
+          return normalizeAllData(JSON.parse(saved));
         } catch (e) {
           console.error("Failed to parse financial data", e);
         }
@@ -529,7 +560,7 @@ export default function App() {
 
       if (cloudData) {
         // We found data in the cloud! Update local state.
-        if (cloudData.allData) setAllData(cloudData.allData);
+        if (cloudData.allData) setAllData(normalizeAllData(cloudData.allData));
         if (cloudData.goals) setGoals(cloudData.goals);
         if (cloudData.userName) setUserName(cloudData.userName);
         showToast('Dados atualizados da nuvem!', 'success');
@@ -869,22 +900,21 @@ export default function App() {
     const totalExpenses = basicExpenses + additionalVariableCosts;
 
     // Real Calculations (isPaid === true)
-    // Note: To use calculateRealTotal, we need to import it at the top of App.tsx, which I'll do in a sec if it's not already there.
-    const realGrossIncome = (currentData.payslipIncome?.subCategories.reduce((acc, sub) => acc + sub.items.reduce((s, i) => s + (i.isPaid ? i.value : 0), 0), 0)) || 0;
-    const realDeductions = (currentData.payslipDeductions?.subCategories.reduce((acc, sub) => acc + sub.items.reduce((s, i) => s + (i.isPaid ? i.value : 0), 0), 0)) || 0;
-    const realBasicExpenses = (currentData.basicExpenses?.subCategories.reduce((acc, sub) => acc + sub.items.reduce((s, i) => s + (i.isPaid ? i.value : 0), 0), 0)) || 0;
-    const realVars = (currentData.additionalVariableCosts?.subCategories.reduce((acc, sub) => acc + sub.items.reduce((s, i) => s + (i.isPaid ? i.value : 0), 0), 0)) || 0;
-    const realInvest = (currentData.investments?.subCategories.reduce((acc, sub) => acc + sub.items.reduce((s, i) => s + (i.isPaid ? i.value : 0), 0), 0)) || 0;
+    const realGrossIncome = (currentData.payslipIncome?.subCategories?.reduce((acc, sub) => acc + (sub.items?.reduce((s, i) => s + (i.isPaid ? i.value : 0), 0) || 0), 0)) || 0;
+    const realDeductions = (currentData.payslipDeductions?.subCategories?.reduce((acc, sub) => acc + (sub.items?.reduce((s, i) => s + (i.isPaid ? i.value : 0), 0) || 0), 0)) || 0;
+    const realBasicExpenses = (currentData.basicExpenses?.subCategories?.reduce((acc, sub) => acc + (sub.items?.reduce((s, i) => s + (i.isPaid ? i.value : 0), 0) || 0), 0)) || 0;
+    const realVars = (currentData.additionalVariableCosts?.subCategories?.reduce((acc, sub) => acc + (sub.items?.reduce((s, i) => s + (i.isPaid ? i.value : 0), 0) || 0), 0)) || 0;
+    const realInvest = (currentData.investments?.subCategories?.reduce((acc, sub) => acc + (sub.items?.reduce((s, i) => s + (i.isPaid ? i.value : 0), 0) || 0), 0)) || 0;
     const realTotalExpenses = realBasicExpenses + realVars;
     const realNetIncome = realGrossIncome - realDeductions;
 
     // Calculate Individual Net Incomes
-    const pedroGross = currentData.payslipIncome.subCategories.find(s => s.id === 'pedroIncome')?.items.reduce((sum, i) => sum + i.value, 0) || 0;
-    const pedroDeds = currentData.payslipDeductions.subCategories.find(s => s.id === 'pedroDeductions')?.items.reduce((sum, i) => sum + i.value, 0) || 0;
+    const pedroGross = currentData.payslipIncome?.subCategories?.find(s => s.id === 'pedroIncome')?.items?.reduce((sum, i) => sum + i.value, 0) || 0;
+    const pedroDeds = currentData.payslipDeductions?.subCategories?.find(s => s.id === 'pedroDeductions')?.items?.reduce((sum, i) => sum + i.value, 0) || 0;
     const pedroNetIncome = pedroGross - pedroDeds;
 
-    const izabelGross = currentData.payslipIncome.subCategories.find(s => s.id === 'izabelIncome')?.items.reduce((sum, i) => sum + i.value, 0) || 0;
-    const izabelDeds = currentData.payslipDeductions.subCategories.find(s => s.id === 'izabelDeductions')?.items.reduce((sum, i) => sum + i.value, 0) || 0;
+    const izabelGross = currentData.payslipIncome?.subCategories?.find(s => s.id === 'izabelIncome')?.items?.reduce((sum, i) => sum + i.value, 0) || 0;
+    const izabelDeds = currentData.payslipDeductions?.subCategories?.find(s => s.id === 'izabelDeductions')?.items?.reduce((sum, i) => sum + i.value, 0) || 0;
     const izabelNetIncome = izabelGross - izabelDeds;
 
     // Calculate Monthly Result
@@ -931,7 +961,8 @@ export default function App() {
       realTotalExpenses,
       realInvest,
       realDeductions,
-      realBalance: previousBalance + (realNetIncome - realTotalExpenses - realInvest)
+      realBalance: previousBalance + (realNetIncome - realTotalExpenses - realInvest),
+      realNetIncome
     };
   }, [currentData, allData, currentMonthKey]);
 
@@ -965,27 +996,26 @@ export default function App() {
         return <MonthlyView
           data={currentData}
           totals={totals}
-          currentMonth={currentDate}
           onPreviousMonth={() => handleMonthChange('prev')}
           onNextMonth={() => handleMonthChange('next')}
-          monthlyInvestmentContributions={totals.investments}
-          handleValueChange={(cat: any, subId: any, itemId: any, val: any) => updateItem(cat, subId, itemId, { value: val })}
-          handleNameChange={(cat: any, sub: any, id: any, val: any) => updateItem(cat, sub, id, { name: val })}
-          handleCategoryTitleChange={(cat: any, val: any) => updateData({ ...currentData, [cat]: { ...currentData[cat], title: val } })}
-          handleBudgetChange={(cat: any, val: any) => updateData({ ...currentData, [cat]: { ...currentData[cat], budget: val } })}
-          handleRateChange={(cat: any, sub: any, id: any, val: any) => updateItem(cat, sub, id, { annualRate: val })}
-          handleAddItem={(cat: any, subId: any) => {
+          onUpdate={updateData}
+          onNavigate={(dir) => handleMonthChange(dir)}
+          currentMonth={currentDate}
+          handleAddItem={(cat, subId) => {
             const catData = currentData[cat as keyof FinancialData];
-            const subCats = catData.subCategories.map(s => s.id === subId ? { ...s, items: [...s.items, { id: `new- ${Date.now()} `, name: '', value: 0 }] } : s);
+            const subCats = catData.subCategories.map(s => s.id === subId ? { ...s, items: [...s.items, { id: `item-${Date.now()}`, name: 'Novo Item', value: 0 }] } : s);
             updateData({ ...currentData, [cat]: { ...catData, subCategories: subCats } });
-            showToast('Novo item adicionado.', 'success');
           }}
           handleDeleteItem={(cat: any, subId: any, itemId: any) => {
             const catData = currentData[cat as keyof FinancialData];
             const subCats = catData.subCategories.map(s => s.id === subId ? { ...s, items: s.items.filter(i => i.id !== itemId) } : s);
             updateData({ ...currentData, [cat]: { ...catData, subCategories: subCats } });
-            showToast('Item removido.', 'info');
           }}
+          handleValueChange={(cat: any, subId: any, itemId: any, val: any) => updateItem(cat, subId, itemId, { value: val })}
+          handleNameChange={(cat: any, sub: any, id: any, val: any) => updateItem(cat, sub, id, { name: val })}
+          handleCategoryTitleChange={(cat: any, val: any) => updateData({ ...currentData, [cat]: { ...currentData[cat], title: val } })}
+          handleBudgetChange={(cat: any, val: any) => updateData({ ...currentData, [cat]: { ...currentData[cat], budget: val } })}
+          handleRateChange={(cat: any, sub: any, id: any, val: any) => updateItem(cat, sub, id, { annualRate: val })}
           handleToggleRecurring={(cat: any, subId: any, itemId: any) => {
             const item = currentData[cat as keyof FinancialData].subCategories.find(s => s.id === subId)?.items.find(i => i.id === itemId);
             if (item) updateItem(cat as keyof FinancialData, subId, itemId, { isRecurring: !item.isRecurring });
@@ -1069,51 +1099,52 @@ export default function App() {
       <main className="flex-1 overflow-y-auto w-full transition-all duration-500 pb-24 md:pb-6">
         <div className="max-w-[1600px] w-full p-4 md:p-10 transition-all duration-500">
 
-          {/* Header Mobile (Logo + Theme Toggle only) */}
-          <div className="md:hidden flex justify-between items-center mb-6">
-            <div className="flex items-center gap-3">
-              <img src="/pwa-192x192.png" alt="Logo" className="w-8 h-8 rounded-lg shadow-md" />
-              <h1 className="font-black text-xl text-slate-800 dark:text-white tracking-tighter">Finex</h1>
+          <header 
+            data-scrolled={isScrolled}
+            className="sticky top-0 z-30 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-md border-b border-transparent data-[scrolled=true]:border-slate-200 dark:data-[scrolled=true]:border-slate-800 data-[scrolled=true]:shadow-sm -mx-4 md:-mx-10 px-4 md:px-10 py-4 transition-all duration-300"
+          >
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div className="flex items-center gap-4">
+                <div className="transition-all duration-500 transform data-[scrolled=true]:scale-90">
+                  <h1 className="text-2xl md:text-3xl font-extrabold text-slate-800 dark:text-white tracking-tight flex items-center gap-3">
+                    <span className="md:hidden w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white text-xs">F</span>
+                    {currentView === 'dashboard' ? `Dashboard` :
+                      currentView === 'monthly' ? 'Lançamentos' :
+                        currentView === 'annual' ? 'Relatórios' :
+                          currentView === 'cards' ? 'Cartões' :
+                            currentView === 'accounts' ? 'Contas' : ''}
+                  </h1>
+                </div>
+                
+                {/* Desktop Sticky KPI Bar */}
+                <div className={`hidden lg:block transition-all duration-500 ${isScrolled ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
+                  <CompactKPIBar totals={totals} />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 w-full md:w-auto">
+                <div className="flex-1 md:flex-none">
+                  <MonthNavigator
+                    currentMonth={currentDate}
+                    onPrevious={() => handleMonthChange('prev')}
+                    onNext={() => handleMonthChange('next')}
+                  />
+                </div>
+                <button onClick={toggleTheme} className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-400 shadow-sm">
+                  <span className="material-symbols-rounded text-xl">{isDarkMode ? 'light_mode' : 'dark_mode'}</span>
+                </button>
+              </div>
             </div>
-            <button onClick={toggleTheme} className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-400">
-              <span className="material-symbols-rounded">{isDarkMode ? 'light_mode' : 'dark_mode'}</span>
-            </button>
+
+            {/* Mobile Sticky KPI Bar */}
+            <div className={`lg:hidden mt-4 transition-all duration-500 ${isScrolled ? 'opacity-100 h-auto' : 'opacity-0 h-0 overflow-hidden pointer-events-none'}`}>
+              <CompactKPIBar totals={totals} />
+            </div>
+          </header>
+
+          <div className="py-6">
+            {renderContent()}
           </div>
-
-          <div className="hidden md:flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4">
-            <div>
-              <h1 className="text-3xl font-extrabold text-slate-800 dark:text-white tracking-tight">
-                {currentView === 'dashboard' ? `Olá, ${userName} !` :
-                  currentView === 'monthly' ? 'Lançamentos' :
-                    currentView === 'annual' ? 'Relatórios Anuais' :
-                      currentView === 'cards' ? 'Meus Cartões' :
-                        currentView === 'accounts' ? 'Minhas Contas' : ''}
-              </h1>
-              <p className="text-slate-500 dark:text-slate-400 mt-1 font-medium hidden md:block">
-                Gerencie suas finanças com inteligência e clareza.
-              </p>
-            </div>
-            <div className="w-full md:w-auto">
-              <MonthNavigator
-                currentMonth={currentDate}
-                onPrevious={() => handleMonthChange('prev')}
-                onNext={() => handleMonthChange('next')}
-              />
-            </div>
-          </div>
-
-          {/* Mobile Month Navigator (Centered) - HIDE on Monthly View because it is embedded in the Sticky Header */}
-          {currentView !== 'monthly' && (
-            <div className="md:hidden mb-6">
-              <MonthNavigator
-                currentMonth={currentDate}
-                onPrevious={() => handleMonthChange('prev')}
-                onNext={() => handleMonthChange('next')}
-              />
-            </div>
-          )}
-
-          {renderContent()}
         </div>
       </main>
 
@@ -1166,16 +1197,77 @@ export default function App() {
         onSkip={handleSkipTour}
       />
 
-      <div className="fixed bottom-24 right-4 md:bottom-6 md:right-6 z-[40] flex flex-col gap-3 pointer-events-none">
-        {/* Floating Action Button - Positioned higher on mobile to avoid nav bar */}
+      <div className="fixed bottom-24 right-4 md:bottom-6 md:right-6 z-[40] flex flex-col gap-3">
+        {/* Fan Menu Options */}
+        {isFanOpen && (
+          <div className="flex flex-col gap-3 mb-2 animate-fadeIn">
+            {[
+              { id: 'income', icon: 'trending_up', label: 'Receita', color: 'bg-emerald-500' },
+              { id: 'credit_card', icon: 'credit_card', label: 'Cartão', color: 'bg-purple-500' },
+              { id: 'transfer', icon: 'sync_alt', label: 'Transf.', color: 'bg-amber-500' },
+            ].map((item, i) => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  setTransactionForm({ isOpen: true, type: item.id as any });
+                  setIsFanOpen(false);
+                }}
+                className={`flex items-center gap-3 p-3 rounded-2xl text-white shadow-lg transition-all hover:scale-110 active:scale-95 ${item.color} animate-slideUp`}
+                style={{ animationDelay: `${i * 50}ms` }}
+              >
+                <span className="material-symbols-rounded text-xl">{item.icon}</span>
+                <span className="text-[10px] font-black uppercase tracking-widest pr-2">{item.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Main Floating Action Button */}
         <button
           id="fab-add"
-          onClick={() => setIsAddTransactionModalOpen(true)}
-          className="pointer-events-auto bg-indigo-600 hover:bg-indigo-700 text-white rounded-full p-4 shadow-xl hover:scale-105 transition-all active:scale-95 flex items-center justify-center group"
-          title="Novo Lançamento"
+          onClick={() => {
+            if (isFanOpen) {
+              setTransactionForm({ isOpen: true, type: 'expense' });
+              setIsFanOpen(false);
+            } else {
+              setIsFanOpen(true);
+            }
+          }}
+          className={`pointer-events-auto w-16 h-16 rounded-full shadow-2xl flex items-center justify-center transition-all duration-500 active:scale-90 ${
+            isFanOpen ? 'bg-rose-500 rotate-45' : 'bg-indigo-600 hover:bg-indigo-700'
+          }`}
         >
-          <span className="material-symbols-rounded text-3xl group-hover:rotate-90 transition-transform duration-300">add</span>
+          <span className="material-symbols-rounded text-3xl text-white">
+            {isFanOpen ? 'close' : 'add'}
+          </span>
         </button>
+
+        {transactionForm.isOpen && (
+          <TransactionFormScreen
+            isOpen={transactionForm.isOpen}
+            onClose={() => setTransactionForm({ isOpen: false })}
+            onSave={(data) => {
+              // Convert TransactionForm data to AddTransactionModal format
+              const mapping: any = {
+                expense: { categoryId: 'additionalVariableCosts', subCategoryId: 'mainVar', paymentMethod: 'debit' },
+                income: { categoryId: 'payslipIncome', subCategoryId: 'pedroIncome', paymentMethod: 'debit' },
+                credit_card: { categoryId: 'additionalVariableCosts', subCategoryId: 'mainVar', paymentMethod: 'credit' },
+                transfer: { categoryId: 'additionalVariableCosts', subCategoryId: 'mainVar', paymentMethod: 'debit' },
+              };
+              const config = mapping[data.type] || mapping.expense;
+              handleAddTransaction({
+                ...data,
+                ...config,
+                date: new Date(data.date),
+                installments: data.installments || 1
+              });
+              setTransactionForm({ isOpen: false });
+            }}
+            initialType={transactionForm.type as any}
+            accounts={currentData.accounts || []}
+            creditCards={currentData.cards || []}
+          />
+        )}
 
         {toasts.map(toast => (
           <div key={toast.id} className="pointer-events-auto">

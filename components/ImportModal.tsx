@@ -1,22 +1,24 @@
 import React, { useState } from 'react';
 import { processImageWithGemini, processExcelFile } from '../services/fileProcessingService';
-import { FinancialData } from '../types';
+import { FinancialData, Account } from '../types';
+import { getOwnerLabel } from '../utils';
 
 interface ImportModalProps {
     isOpen: boolean;
     onClose: () => void;
     onImport: (data: Partial<FinancialData>) => void;
+    onFullRestore?: (data: { allData: any; goals?: any[] }) => void;
     initialFile?: File | null;
     accounts?: Account[];
 }
 
-import { FinancialData, Account } from '../types';
-
 export const ImportModal: React.FC<ImportModalProps> = (props) => {
-    const { isOpen, onClose, onImport, initialFile, accounts } = props;
+    const { isOpen, onClose, onImport, onFullRestore, initialFile, accounts } = props;
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [previewData, setPreviewData] = useState<any | null>(null);
+    const [isFullBackup, setIsFullBackup] = useState(false);
+    const [backupSummary, setBackupSummary] = useState<{ months: number; goals: number } | null>(null);
     const [fileName, setFileName] = useState<string>('');
     const [selectedAccountId, setSelectedAccountId] = useState<string>('');
 
@@ -33,24 +35,40 @@ export const ImportModal: React.FC<ImportModalProps> = (props) => {
         setError(null);
         setFileName(file.name);
         setPreviewData(null);
+        setIsFullBackup(false);
+        setBackupSummary(null);
 
         try {
             let data;
-            if (file.type === 'application/pdf' || file.type.startsWith('image/')) {
+            if (file.name.endsWith('.json') || file.type === 'application/json') {
+                // --- RESTAURAÇÃO DE BACKUP FINEXUS ---
+                const text = await file.text();
+                const parsed = JSON.parse(text);
+
+                if (parsed && parsed.allData && typeof parsed.allData === 'object') {
+                    // É um backup completo
+                    const months = Object.keys(parsed.allData).length;
+                    const goals = Array.isArray(parsed.goals) ? parsed.goals.length : 0;
+                    setIsFullBackup(true);
+                    setBackupSummary({ months, goals });
+                    setPreviewData(parsed);
+                } else {
+                    throw new Error('JSON inválido: não é um backup Finexus reconhecido (falta a chave "allData").');
+                }
+            } else if (file.type === 'application/pdf' || file.type.startsWith('image/')) {
                 // AI Processing for Images/PDFs
                 data = await processImageWithGemini(file);
+                setPreviewData(data);
             } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
                 // Excel Processing
                 data = await processExcelFile(file);
-                // Note: Excel processing currently returns empty object in service, needs logic
                 if (Object.keys(data).length === 0) {
                     setError("Processamento de Excel simplificado ainda não mapeou dados automaticamente. (WIP)");
                 }
+                setPreviewData(data);
             } else {
-                throw new Error("Formato de arquivo não suportado.");
+                throw new Error("Formato de arquivo não suportado. Use .json (backup), .pdf ou imagem.");
             }
-
-            setPreviewData(data);
         } catch (err: any) {
             console.error(err);
             setError(err.message || "Erro ao processar arquivo");
@@ -74,31 +92,32 @@ export const ImportModal: React.FC<ImportModalProps> = (props) => {
     };
 
     const handleConfirm = () => {
-        if (previewData) {
-            // Here we would transform legacy/generic AI structure to FinancialData
-            // For now, passing raw or mocking logic
-            // TODO: Map 'receitas' and 'deducoes' from AI to FinancialData structure
+        if (!previewData) return;
 
-            // Mock transformation for demonstration based on prompt structure
-            // We need to map this to the specific structure expected by App.tsx/utils.ts
-
-            console.log("Importing Data:", previewData);
-
-            // Inject accountId into items
-            const enhancedData = { ...previewData };
-
-            if (selectedAccountId) {
-                if (enhancedData.receitas) {
-                    enhancedData.receitas = enhancedData.receitas.map((i: any) => ({ ...i, accountId: selectedAccountId }));
-                }
-                if (enhancedData.deducoes) {
-                    enhancedData.deducoes = enhancedData.deducoes.map((i: any) => ({ ...i, accountId: selectedAccountId }));
-                }
+        if (isFullBackup) {
+            // Restauração completa: repassa para o handler específico no App
+            if (onFullRestore) {
+                onFullRestore({ allData: previewData.allData, goals: previewData.goals });
+            } else {
+                // Fallback: tenta importar só o mês atual via onImport
+                console.warn('[ImportModal] onFullRestore não fornecido. Usando fallback.');
             }
-
-            onImport(enhancedData);
             onClose();
+            return;
         }
+
+        // Importação AI (PDF/contracheque) — injeta accountId e repassa
+        const enhancedData = { ...previewData };
+        if (selectedAccountId) {
+            if (enhancedData.receitas) {
+                enhancedData.receitas = enhancedData.receitas.map((i: any) => ({ ...i, accountId: selectedAccountId }));
+            }
+            if (enhancedData.deducoes) {
+                enhancedData.deducoes = enhancedData.deducoes.map((i: any) => ({ ...i, accountId: selectedAccountId }));
+            }
+        }
+        onImport(enhancedData);
+        onClose();
     };
 
     return (
@@ -129,7 +148,7 @@ export const ImportModal: React.FC<ImportModalProps> = (props) => {
                         <input
                             type="file"
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                            accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls"
+                            accept=".json,.pdf,.png,.jpg,.jpeg,.xlsx,.xls"
                             onChange={handleFileUpload}
                             disabled={loading}
                         />
@@ -142,10 +161,10 @@ export const ImportModal: React.FC<ImportModalProps> = (props) => {
                                 )}
                             </div>
                             <p className="text-slate-300 font-medium">
-                                {loading ? 'Processando com IA...' : 'Arraste ou clique para carregar'}
+                                {loading ? 'Processando...' : 'Arraste ou clique para carregar'}
                             </p>
                             <p className="text-xs text-slate-500">
-                                PDF, Imagem (Contracheque) ou Excel
+                                <span className="text-indigo-400 font-semibold">.json</span> (Backup Finexus) · PDF · Imagem · Excel
                             </p>
                         </div>
                     </div>
@@ -165,12 +184,42 @@ export const ImportModal: React.FC<ImportModalProps> = (props) => {
                         </div>
                     )}
 
-                    {/* Preview Data (JSON Dump for now) */}
-                    {/* Preview Data Structured UI */}
-                    {previewData && (
-                        <div className="space-y-6 animate-slideUp">
+                    {/* Preview: Backup Completo */}
+                    {previewData && isFullBackup && backupSummary && (
+                        <div className="space-y-4 animate-slideUp">
+                            <div className="p-5 bg-indigo-500/10 border border-indigo-500/30 rounded-xl space-y-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-indigo-500/20 rounded-lg">
+                                        <span className="material-symbols-rounded text-indigo-400 text-2xl">restore</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-white">Backup Finexus detectado</p>
+                                        <p className="text-xs text-slate-400">Todos os dados serão restaurados</p>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="bg-slate-900/60 rounded-lg p-3 text-center">
+                                        <p className="text-2xl font-bold text-indigo-400">{backupSummary.months}</p>
+                                        <p className="text-xs text-slate-400 mt-0.5">Meses de histórico</p>
+                                    </div>
+                                    <div className="bg-slate-900/60 rounded-lg p-3 text-center">
+                                        <p className="text-2xl font-bold text-emerald-400">{backupSummary.goals}</p>
+                                        <p className="text-xs text-slate-400 mt-0.5">Metas financeiras</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                                <span className="material-symbols-rounded text-amber-400 text-lg">warning</span>
+                                <p className="text-xs text-amber-300">
+                                    <strong>Atenção:</strong> Esta ação irá <strong>substituir todos os dados atuais</strong> pelos dados do backup.
+                                </p>
+                            </div>
+                        </div>
+                    )}
 
-                            {/* Receitas Section */}
+                    {/* Preview: Importação AI (contracheque, PDF) */}
+                    {previewData && !isFullBackup && (
+                        <div className="space-y-6 animate-slideUp">
                             {previewData.receitas && previewData.receitas.length > 0 && (
                                 <div className="space-y-3">
                                     <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-widest flex items-center gap-2">
@@ -186,11 +235,7 @@ export const ImportModal: React.FC<ImportModalProps> = (props) => {
                                                     </div>
                                                     <div>
                                                         <p className="text-sm font-medium text-slate-200 break-words">{item.descricao}</p>
-                                                        <div className="flex items-center gap-2 mt-0.5">
-                                                            <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-                                                                {item.pessoa || 'Geral'}
-                                                            </span>
-                                                        </div>
+                                                        <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">{item.pessoa || 'Geral'}</span>
                                                     </div>
                                                 </div>
                                                 <span className="font-bold text-emerald-400">
@@ -201,8 +246,6 @@ export const ImportModal: React.FC<ImportModalProps> = (props) => {
                                     </div>
                                 </div>
                             )}
-
-                            {/* Deducoes Section */}
                             {previewData.deducoes && previewData.deducoes.length > 0 && (
                                 <div className="space-y-3">
                                     <h3 className="text-xs font-bold text-red-400 uppercase tracking-widest flex items-center gap-2">
@@ -218,11 +261,7 @@ export const ImportModal: React.FC<ImportModalProps> = (props) => {
                                                     </div>
                                                     <div>
                                                         <p className="text-sm font-medium text-slate-200 break-words">{item.descricao}</p>
-                                                        <div className="flex items-center gap-2 mt-0.5">
-                                                            <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-                                                                {item.pessoa || 'Geral'}
-                                                            </span>
-                                                        </div>
+                                                        <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">{item.pessoa || 'Geral'}</span>
                                                     </div>
                                                 </div>
                                                 <span className="font-bold text-red-400">
@@ -233,12 +272,9 @@ export const ImportModal: React.FC<ImportModalProps> = (props) => {
                                     </div>
                                 </div>
                             )}
-
                             <div className="flex items-center justify-center gap-2 py-2">
                                 <span className="material-symbols-rounded text-slate-500 text-sm">info</span>
-                                <p className="text-xs text-slate-500 italic">
-                                    Verifique os dados acima antes de confirmar a importação.
-                                </p>
+                                <p className="text-xs text-slate-500 italic">Verifique os dados acima antes de confirmar a importação.</p>
                             </div>
                         </div>
                     )}
@@ -256,7 +292,7 @@ export const ImportModal: React.FC<ImportModalProps> = (props) => {
                         >
                             <option value="">Sem vínculo de conta</option>
                             {accounts.map(acc => (
-                                <option key={acc.id} value={acc.id}>{acc.name} ({acc.owner === 'joint' ? 'Conjunta' : acc.owner})</option>
+                                <option key={acc.id} value={acc.id}>{acc.name} ({getOwnerLabel(acc.owner)})</option>
                             ))}
                         </select>
                         <p className="text-[10px] text-slate-500 mt-1">Ao selecionar uma conta, todos os lançamentos importados afetarão o saldo dela.</p>

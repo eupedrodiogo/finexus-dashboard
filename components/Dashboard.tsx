@@ -68,13 +68,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, totals, allData, goa
   ].filter(d => d.value > 0), [totals]);
 
   const trendData = useMemo(() => {
-    return Object.keys(allData).sort().slice(-6).map(key => {
+    return Object.keys(allData).sort().filter(k => k.includes('-')).slice(-6).map(key => {
       const d = allData[key];
       const monthStr = new Date(key + '-02').toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
-      const income = d.payslipIncome.subCategories.reduce((acc, sub) => acc + sub.items.reduce((sum, item) => sum + item.value, 0), 0) -
-        d.payslipDeductions.subCategories.reduce((acc, sub) => acc + sub.items.reduce((sum, item) => sum + item.value, 0), 0);
-      const expense = d.basicExpenses.subCategories.reduce((acc, sub) => acc + sub.items.reduce((sum, item) => sum + item.value, 0), 0) +
-        d.additionalVariableCosts.subCategories.reduce((acc, sub) => acc + sub.items.reduce((sum, item) => sum + item.value, 0), 0);
+      
+      const income = (d.payslipIncome?.subCategories?.reduce((acc, sub) => acc + sub.items.reduce((sum, item) => sum + item.value, 0), 0) || 0) -
+        (d.payslipDeductions?.subCategories?.reduce((acc, sub) => acc + sub.items.reduce((sum, item) => sum + item.value, 0), 0) || 0);
+        
+      const expense = (d.basicExpenses?.subCategories?.reduce((acc, sub) => acc + sub.items.reduce((sum, item) => sum + item.value, 0), 0) || 0) +
+        (d.additionalVariableCosts?.subCategories?.reduce((acc, sub) => acc + sub.items.reduce((sum, item) => sum + item.value, 0), 0) || 0);
+        
       return { month: monthStr, Receita: income, Despesa: expense };
     });
   }, [allData]);
@@ -82,8 +85,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, totals, allData, goa
   const topExpenses = useMemo(() => {
     const items: any[] = [];
     const collect = (cat: any, label: string, color: string) => {
-      cat.subCategories.forEach((sub: any) => {
-        sub.items.forEach((item: any) => {
+      cat?.subCategories?.forEach((sub: any) => {
+        sub?.items?.forEach((item: any) => {
           if (item.value > 0) items.push({ ...item, category: label, color });
         });
       });

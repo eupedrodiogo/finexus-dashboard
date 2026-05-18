@@ -1,5 +1,5 @@
-
 import React, { useState, useRef, useEffect } from 'react';
+import { Trash2, Repeat, Circle, CheckCircle2, Save, MoreVertical, EyeOff } from 'lucide-react';
 
 export interface EditableRowProps {
   label: string;
@@ -7,99 +7,183 @@ export interface EditableRowProps {
   isRecurring?: boolean;
   annualRate?: number;
   isPaid?: boolean;
-  onChange: (val: number) => void;
-  onNameChange: (val: string) => void;
-  onRateChange?: (val: number) => void;
+  isIgnored?: boolean;
+  onEditClick: () => void;
   onDelete: () => void;
   onToggleRecurring: () => void;
   onTogglePaid: () => void;
+  onToggleIgnored: () => void;
+  onUpdate?: (updates: { name?: string, value?: number }) => void;
+  isSelected?: boolean;
+  onSelectToggle?: () => void;
+  onShowManagement?: () => void;
   accountColor?: string;
   accountName?: string;
 }
 
-export const EditableRow: React.FC<EditableRowProps> = ({ label, value, isRecurring, annualRate, isPaid, onChange, onNameChange, onRateChange, onDelete, onToggleRecurring, onTogglePaid, accountColor, accountName }) => {
-  const [isHovered, setIsHovered] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+export const EditableRow: React.FC<EditableRowProps> = ({ 
+  label, value, isRecurring, annualRate, isPaid, isIgnored,
+  onEditClick, onDelete, 
+  onToggleRecurring, onTogglePaid, onToggleIgnored, onUpdate, accountColor, accountName,
+  isSelected, onSelectToggle, onShowManagement
+}) => {
+  const [menuDirection, setMenuDirection] = useState<'up' | 'down'>('down');
+  const [showActions, setShowActions] = useState(false);
+  const [editingField, setEditingField] = useState<'name' | 'value' | null>(null);
+  const [tempName, setTempName] = useState(label);
+  const [tempValue, setTempValue] = useState(value.toString());
+  
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const valueInputRef = useRef<HTMLInputElement>(null);
+  const actionButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+    setTempName(label);
+    setTempValue(value.toString());
+  }, [label, value]);
+
+  const toggleMenu = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onShowManagement?.();
+  };
+
+  const handleSave = () => {
+    if (!onUpdate) return;
+    
+    const updates: { name?: string, value?: number } = {};
+    if (editingField === 'name' && tempName !== label) {
+      updates.name = tempName;
     }
-  }, [label]);
+    if (editingField === 'value') {
+      const numVal = parseFloat(tempValue.replace(',', '.'));
+      if (!isNaN(numVal) && numVal !== value) {
+        updates.value = numVal;
+      }
+    }
+
+    if (Object.keys(updates).length > 0) {
+      onUpdate(updates);
+    }
+    setEditingField(null);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleSave();
+    if (e.key === 'Escape') {
+      setTempName(label);
+      setTempValue(value.toString());
+      setEditingField(null);
+    }
+  };
 
   return (
     <div
-      className="group relative flex items-center justify-between p-3 rounded-xl hover:bg-white/60 dark:hover:bg-slate-800/50 transition-colors"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      className={`group relative flex items-center justify-between py-2 px-3 rounded-2xl transition-all duration-300 border ${
+        isSelected 
+          ? 'bg-indigo-50/80 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800' 
+          : 'hover:bg-slate-50 dark:hover:bg-slate-800/50 border-transparent'
+      } ${isIgnored ? 'opacity-40' : 'opacity-100'}`}
     >
-      <div className="flex items-center gap-3 flex-1 mr-4">
-        <button
-          onClick={onTogglePaid}
-          className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1.5 ${isPaid ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 hover:border-emerald-400'}`}
-          title={isPaid ? "Realizado/Pago" : "Pendente"}
-        >
-          {isPaid && <span className="material-symbols-rounded notranslate text-white text-[10px] font-bold">check</span>}
-        </button>
-        <button
-          onClick={onToggleRecurring}
-          className={`w-2 h-2 rounded-full transition-all flex-shrink-0 mt-1.5 ${isRecurring ? 'bg-indigo-500 ring-2 ring-indigo-200' : 'bg-slate-300'}`}
-          title={isRecurring ? "Recorrente" : "Não recorrente"}
-        />
-        {accountColor && (
-          <div
-            className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
-            style={{ backgroundColor: accountColor }}
-            title={`Conta: ${accountName}`}
-          />
-        )}
-        <textarea
-          ref={textareaRef}
-          value={label}
-          rows={1}
-          onChange={(e) => {
-            onNameChange(e.target.value);
-            e.target.style.height = 'auto';
-            e.target.style.height = e.target.scrollHeight + 'px';
-          }}
-          className="font-medium text-slate-700 dark:text-slate-200 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none transition-colors w-full placeholder-slate-400 resize-none overflow-hidden min-h-[24px] py-0.5 leading-relaxed"
-          placeholder="Nome do item"
-        />
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        {/* Selection & Status Group */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div 
+            onClick={(e) => { e.stopPropagation(); onSelectToggle?.(); }}
+            className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
+              isSelected 
+                ? 'bg-indigo-600 border-indigo-600' 
+                : 'border-slate-400 dark:border-slate-600'
+            }`}
+          >
+            {isSelected && <div className="w-1 h-1 bg-white rounded-full" />}
+          </div>
+
+          <button
+            onClick={(e) => { e.stopPropagation(); onTogglePaid(); }}
+            className={`transition-all ${
+              isPaid ? 'text-emerald-500' : 'text-slate-300 dark:text-slate-700'
+            }`}
+          >
+            {isPaid ? <CheckCircle2 size={18} strokeWidth={2.5} /> : <Circle size={18} strokeWidth={2} />}
+          </button>
+        </div>
+
+        {/* Name Area */}
+        <div className="flex-1 min-w-0 flex items-center gap-2">
+          {editingField === 'name' ? (
+            <input
+              ref={nameInputRef}
+              autoFocus
+              type="text"
+              value={tempName}
+              onChange={(e) => setTempName(e.target.value)}
+              onBlur={handleSave}
+              onKeyDown={handleKeyDown}
+              className="w-full bg-white dark:bg-slate-900 border-b border-indigo-500 text-sm font-bold text-slate-800 dark:text-white focus:outline-none px-1"
+            />
+          ) : (
+            <div className="flex items-center gap-2 min-w-0">
+              <span 
+                onClick={() => setEditingField('name')}
+                className={`text-sm font-bold truncate cursor-text ${
+                  isPaid || isIgnored 
+                    ? 'text-slate-500 dark:text-slate-400 line-through' 
+                    : 'text-slate-700 dark:text-slate-200'
+                }`}
+              >
+                {label || 'Sem descrição'}
+              </span>
+              
+              {/* Discrete Badges */}
+              {isRecurring && (
+                <Repeat size={10} className="text-indigo-500 flex-shrink-0" strokeWidth={3} />
+              )}
+              {accountColor && (
+                <div 
+                  className="w-1.5 h-1.5 rounded-full flex-shrink-0 shadow-[0_0_4px_rgba(0,0,0,0.1)]" 
+                  style={{ backgroundColor: accountColor }}
+                  title={accountName}
+                />
+              )}
+              {isIgnored && <EyeOff size={10} className="text-amber-500 flex-shrink-0" />}
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="flex items-center gap-2 flex-shrink-0">
-
-        {onRateChange && (
-          <div className={`flex items-center mr-2 transition-all duration-200 ${isHovered || (annualRate && annualRate > 0) ? 'opacity-100 max-w-[60px]' : 'opacity-0 max-w-0 overflow-hidden'}`}>
-            <input
-              type="number"
-              value={annualRate || ''}
-              onChange={(e) => onRateChange(parseFloat(e.target.value))}
-              placeholder="%"
-              title="Taxa anual (%)"
-              className="w-10 text-right text-xs text-slate-500 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none"
-            />
-            <span className="text-[10px] text-slate-400 ml-0.5">%</span>
-          </div>
+      <div className="flex items-center gap-2 ml-4">
+        {/* Value Area */}
+        {editingField === 'value' ? (
+          <input
+            ref={valueInputRef}
+            autoFocus
+            type="number"
+            step="0.01"
+            value={tempValue}
+            onChange={(e) => setTempValue(e.target.value)}
+            onBlur={handleSave}
+            onKeyDown={handleKeyDown}
+            className="w-20 text-right font-black text-sm text-slate-800 dark:text-white bg-transparent border-b border-indigo-500 focus:outline-none"
+          />
+        ) : (
+          <span 
+            onClick={() => setEditingField('value')}
+            className={`text-sm font-black whitespace-nowrap cursor-text ${
+              isPaid || isIgnored ? 'text-slate-500' : 'text-slate-800 dark:text-slate-100'
+            }`}
+          >
+            {new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}
+          </span>
         )}
-
-        <span className="text-xs text-slate-400 font-medium">R$</span>
-        <input
-          type="number"
-          value={value}
-          onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-          className="w-24 bg-transparent text-right font-bold text-slate-800 dark:text-white border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none transition-colors"
-        />
-
-        {/* Delete Action (Micro-interaction: only visible on hover) */}
-        <button
-          onClick={onDelete}
-          className={`ml-2 text-slate-400 hover:text-rose-500 transition-all transform duration-200 ${isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-2 pointer-events-none'}`}
-          title="Excluir item"
-        >
-          <span className="material-symbols-rounded notranslate text-lg">delete</span>
-        </button>
+        <div className="relative">
+          <button
+            ref={actionButtonRef}
+            onClick={toggleMenu}
+            className="p-2 rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors active:scale-90"
+          >
+            <MoreVertical size={18} />
+          </button>
+        </div>
       </div>
     </div>
   );

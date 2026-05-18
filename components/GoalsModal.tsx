@@ -89,13 +89,13 @@ export const GoalsModal: React.FC<GoalsModalProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nome da Meta</label>
-                <input
-                  type="text"
+                <textarea
                   value={formData.name}
                   onChange={e => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-700 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
-                  placeholder="Ex: Viagem, Carro Novo..."
+                  className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-sm font-semibold text-slate-700 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all resize-none min-h-[60px]"
+                  placeholder="Ex: Viagem de final de ano com a família..."
                   required
+                  rows={2}
                 />
               </div>
               <div className="space-y-1">
@@ -187,7 +187,7 @@ export const GoalsModal: React.FC<GoalsModalProps> = ({
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex justify-between items-start mb-1">
-                          <h4 className="font-bold text-slate-800 dark:text-white truncate">{goal.name}</h4>
+                          <h4 className="font-bold text-slate-800 dark:text-white whitespace-normal break-words leading-tight">{goal.name}</h4>
                           <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded text-slate-500 dark:text-slate-300">
                             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(goal.targetValue)}
                           </span>

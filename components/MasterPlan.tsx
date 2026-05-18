@@ -49,9 +49,10 @@ const extratoData = [
 
 interface MasterPlanProps {
   isDarkMode: boolean;
+  isPedro?: boolean;
 }
 
-export const MasterPlan: React.FC<MasterPlanProps> = ({ isDarkMode }) => {
+export const MasterPlan: React.FC<MasterPlanProps> = ({ isDarkMode, isPedro = false }) => {
   const [activeTab, setActiveTab] = useState('overview'); 
   const isDark = isDarkMode;
 
@@ -86,7 +87,7 @@ export const MasterPlan: React.FC<MasterPlanProps> = ({ isDarkMode }) => {
   };
 
   return (
-    <div className={`w-full max-w-[1600px] mx-auto ${theme.bgMain} ${theme.shadowCard} transition-colors duration-300 animate-fadeIn`}>
+    <div className={`w-full max-w-7xl mx-auto ${theme.bgMain} ${theme.shadowCard} transition-colors duration-300 animate-fadeIn`}>
       {/* Cabeçalho */}
       <header className={`mb-6 border-b ${theme.headerBorder} pb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-colors`}>
         <div>
@@ -95,7 +96,7 @@ export const MasterPlan: React.FC<MasterPlanProps> = ({ isDarkMode }) => {
             Master Plan 2026-2027
           </h1>
           <p className={`${theme.textSecondary} mt-1 text-sm md:text-base transition-colors`}>
-            Plano Estratégico de Desalavancagem e Escala Patrimonial — Pedro &amp; Izabel
+            Plano Estratégico de Desalavancagem e Escala Patrimonial — {isPedro ? 'Pedro & Izabel' : 'Membros 1 & 2'}
           </p>
         </div>
         
@@ -119,7 +120,7 @@ export const MasterPlan: React.FC<MasterPlanProps> = ({ isDarkMode }) => {
           onClick={() => setActiveTab('izabel')}
           className={`px-4 py-2.5 rounded-lg font-medium text-sm flex items-center gap-2 transition-all duration-200 shadow-sm ${activeTab === 'izabel' ? theme.tabActiveBg : theme.tabInactiveBg}`}
         >
-          <HeartIcon className="w-4 h-4" /> Visão Izabel
+          <HeartIcon className="w-4 h-4" /> Visão {isPedro ? 'Izabel' : 'Membro 2'}
         </button>
         <button 
           onClick={() => setActiveTab('comparativo')}
@@ -161,7 +162,7 @@ export const MasterPlan: React.FC<MasterPlanProps> = ({ isDarkMode }) => {
           <div className={`mb-6 p-4 rounded-xl border flex items-start gap-4 ${theme.alertBg}`}>
             <TrophyIcon className={`w-6 h-6 mt-0.5 shrink-0 ${theme.alertText}`} />
             <div>
-              <h4 className={`font-bold ${theme.alertText}`}>Ataque Validado: Restituição do Santander (Abril/2026)</h4>
+              <h4 className={`font-bold ${theme.alertText}`}>Ataque Validado: Restituição do {isPedro ? 'Santander' : 'Banco'} (Abril/2026)</h4>
               <p className={`text-sm mt-1 ${theme.textSecondary} ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                 A notificação oficial contra o desconto indevido vai gerar o reembolso retroativo. Estimamos a entrada de <strong>R$ 1.250,00</strong> na sua conta em Abril. Este valor cria uma super amortização de R$ 1.576,00, cortando 6 parcelas de uma vez!
               </p>
@@ -183,7 +184,7 @@ export const MasterPlan: React.FC<MasterPlanProps> = ({ isDarkMode }) => {
               </div>
               <div className={`text-xs ${theme.textSecondary} flex items-center gap-1.5 mt-2`}>
                 <CheckCircleIcon className="h-4 w-4 text-orange-500" />
-                Banco Inter (Tesouro Selic)
+                Banco Exemplo (Tesouro Selic)
               </div>
             </div>
 
@@ -254,7 +255,7 @@ export const MasterPlan: React.FC<MasterPlanProps> = ({ isDarkMode }) => {
                       <span className="text-[10px] font-black px-3 py-1 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-lg tracking-widest leading-none">AGORA</span>
                     </h3>
                     <p className={`${theme.textSecondary} mt-3 text-sm md:text-base leading-relaxed`}>
-                      Injeção dupla: <strong className={isDark ? "text-slate-200" : "text-slate-700"}>R$ 3.560</strong> de devolução seguidos de <strong className={isDark ? "text-slate-200" : "text-slate-700"}>R$ 1.250</strong> do Reembolso Santander. Contrato do Pedro encolhe massivamente.
+                      Injeção dupla: <strong className={isDark ? "text-slate-200" : "text-slate-700"}>R$ 3.560</strong> de devolução seguidos de <strong className={isDark ? "text-slate-200" : "text-slate-700"}>R$ 1.250</strong> do Reembolso {isPedro ? 'Santander' : 'Bancário'}. Contrato do {isPedro ? 'Pedro' : 'Membro 1'} encolhe massivamente.
                     </p>
                   </div>
 
@@ -271,7 +272,7 @@ export const MasterPlan: React.FC<MasterPlanProps> = ({ isDarkMode }) => {
                   <div className="relative pl-8 md:pl-10">
                     <div className={`absolute -left-[15px] top-0 w-7 h-7 rounded-full ${theme.cardBg} border-2 border-emerald-500 flex items-center justify-center`}><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full"></div></div>
                     <h3 className="text-xl font-black text-emerald-500">Julho de 2026</h3>
-                    <p className={`${theme.textSecondary} mt-2 text-sm md:text-base font-bold`}>🏆 Contrato Pedro 100% quitado. Inicia o ataque à Izabel.</p>
+                    <p className={`${theme.textSecondary} mt-2 text-sm md:text-base font-bold`}>🏆 Contrato {isPedro ? 'Pedro' : 'Membro 1'} 100% quitado. Inicia o ataque à {isPedro ? 'Izabel' : 'Membro 2'}.</p>
                   </div>
 
                   {/* Fim de 2026 / Início 2027 */}
@@ -307,7 +308,7 @@ export const MasterPlan: React.FC<MasterPlanProps> = ({ isDarkMode }) => {
               <p className={`text-orange-500 font-bold text-[10px] uppercase tracking-widest mb-2`}>Saldo Consolidado</p>
               <h3 className={`text-3xl font-black ${theme.textPrimary} tracking-tighter mb-4`}>R$ 2.411,55</h3>
               <div className={`text-xs ${theme.textSecondary} flex items-center gap-1.5`}>
-                <LandmarkIcon className="h-4 w-4" /> Tesouro Selic 2031
+                <LandmarkIcon className="h-4 w-4" /> Tesouro Selic {isPedro ? '2031' : 'Demo'}
               </div>
             </div>
 
@@ -375,7 +376,7 @@ export const MasterPlan: React.FC<MasterPlanProps> = ({ isDarkMode }) => {
                   <h3 className={`font-black ${theme.textPrimary} flex items-center gap-2`}><div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div> Tesouro Selic</h3>
                   <span className="text-[10px] font-black uppercase tracking-widest px-2 py-1 bg-blue-500/10 text-blue-500 dark:text-blue-400 rounded">Segurança</span>
                 </div>
-                <p className={`text-xs ${theme.textSecondary}`}>Reserva no Banco Inter para liquidez imediata.</p>
+                <p className={`text-xs ${theme.textSecondary}`}>Reserva no Banco para liquidez imediata.</p>
                 <p className={`text-xs font-bold ${theme.textPrimary} mt-2`}>Saldo Atual: <span className="text-blue-500 tracking-tight">R$ 2.411,55</span></p>
               </div>
 
@@ -413,7 +414,7 @@ export const MasterPlan: React.FC<MasterPlanProps> = ({ isDarkMode }) => {
                   <ListIcon className="h-6 w-6 text-blue-500" />
                   Fluxo de Caixa e Amortizações
                 </h2>
-                <p className={`${theme.textSecondary} text-sm mt-2 font-medium`}>Todos os cálculos refletem a entrada do Reembolso do Santander no mês de Abril de 2026.</p>
+                <p className={`${theme.textSecondary} text-sm mt-2 font-medium`}>Todos os cálculos refletem a entrada do Reembolso do {isPedro ? 'Santander' : 'Banco'} no mês de Abril de 2026.</p>
               </div>
             </div>
 
@@ -454,7 +455,7 @@ export const MasterPlan: React.FC<MasterPlanProps> = ({ isDarkMode }) => {
                           ${row.alvo === 'Izabel' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 shadow-sm' : ''}
                           ${row.alvo === 'Livre' ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 shadow-sm' : ''}
                         `}>
-                          {row.alvo}
+                          {row.alvo === 'Pedro' ? (isPedro ? 'Pedro' : 'Membro 1') : row.alvo === 'Izabel' ? (isPedro ? 'Izabel' : 'Membro 2') : row.alvo}
                         </span>
                       </td>
                       <td className={`px-6 py-4 text-xs ${row.status.includes('Quitado') || row.status.includes('🚀') ? 'font-black text-amber-500' : 'font-bold ' + theme.textSecondary}`}>
@@ -490,7 +491,7 @@ export const MasterPlan: React.FC<MasterPlanProps> = ({ isDarkMode }) => {
                 </div>
                 <div>
                   <h2 className={`text-2xl md:text-3xl font-black ${theme.textPrimary}`}>A Estratégia por Trás do Plano 1</h2>
-                  <p className={`${theme.textSecondary} mt-1`}>Um resumo visual preparado especialmente para a Izabel.</p>
+                  <p className={`${theme.textSecondary} mt-1`}>Um resumo visual preparado especialmente para {isPedro ? 'a Izabel' : 'você'}.</p>
                 </div>
               </div>
 
@@ -506,7 +507,7 @@ export const MasterPlan: React.FC<MasterPlanProps> = ({ isDarkMode }) => {
                       <div className="p-2 bg-blue-500/10 rounded-lg text-blue-500"><ShieldCheckIcon className="w-6 h-6"/></div>
                       <div>
                         <p className={`font-bold ${theme.textPrimary}`}>A Defesa Absoluta</p>
-                        <p className={`text-xs ${theme.textSecondary}`}>Garantir o ninho do João Vitor no Tesouro Selic.</p>
+                        <p className={`text-xs ${theme.textSecondary}`}>Garantir o ninho do {isPedro ? 'João Vitor' : 'seu bebê'} no Tesouro Selic.</p>
                       </div>
                     </div>
                   </div>
@@ -516,7 +517,7 @@ export const MasterPlan: React.FC<MasterPlanProps> = ({ isDarkMode }) => {
                       <div className="p-2 bg-orange-500/10 rounded-lg text-orange-500"><ZapIcon className="w-6 h-6"/></div>
                       <div>
                         <p className={`font-bold ${theme.textPrimary}`}>A Guerra contra Juros</p>
-                        <p className={`text-xs ${theme.textSecondary}`}>Esmagar o Santander o mais rápido possível.</p>
+                        <p className={`text-xs ${theme.textSecondary}`}>Esmagar o {isPedro ? 'Santander' : 'Banco'} o mais rápido possível.</p>
                       </div>
                     </div>
                   </div>
@@ -591,7 +592,7 @@ export const MasterPlan: React.FC<MasterPlanProps> = ({ isDarkMode }) => {
                   <div>
                     <h3 className={`text-lg font-bold ${theme.textPrimary} mb-2`}>O Nosso Foco Principal</h3>
                     <p className={`${theme.textSecondary} text-sm leading-relaxed mb-4`}>
-                      A vossa guerra agora não é ficar ricos do dia para a noite na Bolsa de Valores. A vossa guerra é esmagar o banco e preparar o ninho para o João Vitor.
+                      A vossa guerra agora não é ficar ricos do dia para a noite na Bolsa de Valores. A vossa guerra é esmagar o banco e preparar o ninho para o {isPedro ? 'João Vitor' : 'seu bebê'}.
                     </p>
                     <p className={`${theme.textSecondary} text-sm leading-relaxed`}>
                       O <strong>Plano 1</strong> é a injeção de ânimo que vocês precisam. Quando bater o cansaço de pagar os boletos, vocês vão abrir a corretora e ver a "Fábrica de Cotas" a gerar filhotes sozinha. O Plano 2 (A Fortaleza) foi descartado? Não! <strong className={theme.textPrimary}>Ele é a nossa meta oficial para Junho de 2027</strong>, quando vocês já não tiverem dívidas e tiverem quase R$ 2.400,00 livres por mês para investir com peso!

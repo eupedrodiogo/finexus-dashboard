@@ -6,18 +6,34 @@ interface CreditCardsViewProps {
     onUpdateCards: (cards: CreditCard[]) => void;
     allData: Record<string, FinancialData>;
     currentMonth: string;
+    isPedro?: boolean;
 }
 
-export const CreditCardsView: React.FC<CreditCardsViewProps> = ({ cards, onUpdateCards, allData, currentMonth }) => {
-    const [selectedMonth, setSelectedMonth] = useState(currentMonth);
-    const [expandedCard, setExpandedCard] = useState<string | null>(null);
+export const CreditCardsView: React.FC<CreditCardsViewProps> = ({ 
+    cards: rawCards, 
+    onUpdateCards, 
+    allData, 
+    currentMonth,
+    isPedro = true 
+}) => {
+    const cards = isPedro ? rawCards : rawCards.map((c, idx) => ({
+        ...c,
+        name: `Cartão ${idx + 1}`
+    }));
 
-    // ... existing state ...
+    const [expandedCard, setExpandedCard] = useState<string | null>(null);
     const [newCardName, setNewCardName] = useState('');
     const [newCardDueDay, setNewCardDueDay] = useState(10);
     const [newCardClosingDay, setNewCardClosingDay] = useState(3);
     const [newCardColor, setNewCardColor] = useState('bg-slate-800');
+    const [newCardOwner, setNewCardOwner] = useState<'pedro' | 'izabel' | 'joint'>('pedro');
     const [isAddingCard, setIsAddingCard] = useState(false);
+    const [editingCardId, setEditingCardId] = useState<string | null>(null);
+    const [editName, setEditName] = useState('');
+    const [editDueDay, setEditDueDay] = useState(10);
+    const [editClosingDay, setEditClosingDay] = useState(3);
+    const [editColor, setEditColor] = useState('bg-slate-800');
+    const [editOwner, setEditOwner] = useState<'pedro' | 'izabel' | 'joint'>('pedro');
 
     const CARD_COLORS = [
         { class: 'bg-slate-800', label: 'Preto' },
@@ -36,11 +52,32 @@ export const CreditCardsView: React.FC<CreditCardsViewProps> = ({ cards, onUpdat
             name: newCardName,
             color: newCardColor,
             dueDay: newCardDueDay,
-            closingDay: newCardClosingDay
+            closingDay: newCardClosingDay,
+            owner: newCardOwner
         };
         onUpdateCards([...cards, newCard]);
         setNewCardName('');
         setIsAddingCard(false);
+    };
+
+    const handleStartEdit = (card: CreditCard) => {
+        setEditingCardId(card.id);
+        setEditName(card.name);
+        setEditDueDay(card.dueDay);
+        setEditClosingDay(card.closingDay);
+        setEditColor(card.color);
+        setEditOwner(card.owner || 'pedro');
+    };
+
+    const handleUpdateCard = () => {
+        if (!editName || !editingCardId) return;
+        const updatedCards = cards.map(c => 
+            c.id === editingCardId 
+                ? { ...c, name: editName, dueDay: editDueDay, closingDay: editClosingDay, color: editColor, owner: editOwner }
+                : c
+        );
+        onUpdateCards(updatedCards);
+        setEditingCardId(null);
     };
 
     const handleDeleteCard = (id: string) => {
@@ -49,38 +86,69 @@ export const CreditCardsView: React.FC<CreditCardsViewProps> = ({ cards, onUpdat
         }
     };
 
-    const getMonthLabel = (dateString: string) => {
-        const [year, month] = dateString.split('-');
-        const date = new Date(parseInt(year), parseInt(month) - 1, 1);
-        return date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-    };
-
-    const handleMonthChange = (direction: 'prev' | 'next') => {
-        const [year, month] = selectedMonth.split('-');
-        const date = new Date(parseInt(year), parseInt(month) - 1, 1);
-        date.setMonth(date.getMonth() + (direction === 'next' ? 1 : -1));
-        setSelectedMonth(date.toISOString().slice(0, 7));
-    };
-
     const getInvoiceData = (cardId: string) => {
-        const monthData = allData[selectedMonth];
-        if (!monthData) return { total: 0, items: [] };
+        const monthData = allData[currentMonth];
+        const [year, month] = currentMonth.split('-').map(Number);
+        const nextMonthKey = `${month === 12 ? year + 1 : year}-${String(month === 12 ? 1 : month + 1).padStart(2, '0')}`;
+        const nextMonthData = allData[nextMonthKey];
+
+        if (!monthData) return { total: 0, items: [], futureTotal: 0, futureItems: [] };
 
         let total = 0;
         let items: LineItem[] = [];
+        let futureTotal = 0;
+        let futureItems: LineItem[] = [];
 
-        Object.values(monthData).forEach(category => {
-            category.subCategories.forEach(sub => {
-                sub.items.forEach(item => {
-                    if (item.cardId === cardId) {
-                        total += item.value;
-                        items.push({ ...item, categoryName: category.name, subCategoryName: sub.name } as any);
+        const validCategories = ['payslipIncome', 'payslipDeductions', 'basicExpenses', 'additionalVariableCosts', 'investments'];
+        
+        // Processar mês atual
+        validCategories.forEach(key => {
+            const category = monthData[key as keyof FinancialData];
+            if (category && 'subCategories' in category && Array.isArray(category.subCategories)) {
+                category.subCategories.forEach((sub: any) => {
+                    if (sub.items && Array.isArray(sub.items)) {
+                        sub.items.forEach((item: any) => {
+                            if (item.cardId === cardId) {
+                                total += item.value;
+                                items.push({ 
+                                    ...item, 
+                                    categoryName: (category as any).title || (category as any).name, 
+                                    subCategoryName: sub.name 
+                                } as any);
+                            }
+                        });
                     }
                 });
-            });
+            }
         });
 
-        return { total, items };
+        // Processar mês seguinte (para capturar o que já caiu na próxima fatura)
+        if (nextMonthData) {
+            validCategories.forEach(key => {
+                const category = nextMonthData[key as keyof FinancialData];
+                if (category && 'subCategories' in category && Array.isArray(category.subCategories)) {
+                    category.subCategories.forEach((sub: any) => {
+                        if (sub.items && Array.isArray(sub.items)) {
+                            sub.items.forEach((item: any) => {
+                                if (item.cardId === cardId) {
+                                    // Apenas se for a primeira parcela ou compra única
+                                    if (!item.installments || item.installments.current === 1) {
+                                        futureTotal += item.value;
+                                        futureItems.push({ 
+                                            ...item, 
+                                            categoryName: (category as any).title || (category as any).name, 
+                                            subCategoryName: sub.name 
+                                        } as any);
+                                    }
+                                }
+                            });
+                        }
+                    });
+                }
+            });
+        }
+
+        return { total, items, futureTotal, futureItems };
     };
 
     return (
@@ -90,18 +158,6 @@ export const CreditCardsView: React.FC<CreditCardsViewProps> = ({ cards, onUpdat
                 <div>
                     <h2 className="text-xl font-bold text-slate-800 dark:text-white">Faturas do Cartão</h2>
                     <p className="text-sm text-slate-500 dark:text-slate-400">Acompanhe seus gastos e limites.</p>
-                </div>
-
-                <div className="flex items-center gap-4 bg-white dark:bg-slate-900 p-2 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
-                    <button onClick={() => handleMonthChange('prev')} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors">
-                        <span className="material-symbols-rounded">chevron_left</span>
-                    </button>
-                    <span className="font-bold text-slate-700 dark:text-white min-w-[140px] text-center capitalize">
-                        {getMonthLabel(selectedMonth)}
-                    </span>
-                    <button onClick={() => handleMonthChange('next')} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors">
-                        <span className="material-symbols-rounded">chevron_right</span>
-                    </button>
                 </div>
 
                 <button
@@ -155,6 +211,19 @@ export const CreditCardsView: React.FC<CreditCardsViewProps> = ({ cards, onUpdat
                         </div>
 
                         <div>
+                            <label className="text-xs font-bold text-slate-400 uppercase">Dono do Cartão</label>
+                            <select
+                                value={newCardOwner}
+                                onChange={(e) => setNewCardOwner(e.target.value as any)}
+                                className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 py-3 font-bold text-slate-700 dark:text-white focus:ring-2 focus:ring-indigo-500 mt-1"
+                            >
+                                <option value="pedro">{isPedro ? 'Pedro' : 'Proprietário 1'}</option>
+                                <option value="izabel">{isPedro ? 'Izabel' : 'Proprietário 2'}</option>
+                                <option value="joint">Conjunta</option>
+                            </select>
+                        </div>
+
+                        <div>
                             <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Cor do Cartão</label>
                             <div className="flex flex-wrap gap-3">
                                 {CARD_COLORS.map(color => (
@@ -178,7 +247,7 @@ export const CreditCardsView: React.FC<CreditCardsViewProps> = ({ cards, onUpdat
 
                 {/* Existing Cards */}
                 {cards.map(card => {
-                    const { total, items } = getInvoiceData(card.id);
+                    const { total, items, futureTotal, futureItems } = getInvoiceData(card.id);
                     const isExpanded = expandedCard === card.id;
 
                     return (
@@ -202,6 +271,12 @@ export const CreditCardsView: React.FC<CreditCardsViewProps> = ({ cards, onUpdat
                                         </div>
                                     </div>
 
+                                    <div className="z-10 -mt-4">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-white/40 bg-black/20 px-2 py-0.5 rounded">
+                                            {card.owner === 'izabel' ? (isPedro ? 'Izabel' : 'Proprietário 2') : card.owner === 'joint' ? 'Conjunta' : (isPedro ? 'Pedro' : 'Proprietário 1')}
+                                        </span>
+                                    </div>
+
                                     <div className="flex justify-between items-end z-10 text-white">
                                         <h3 className="font-black text-xl tracking-tight">{card.name}</h3>
                                         <div className="flex items-center gap-1 text-white/80 text-xs font-bold bg-black/20 px-2 py-1 rounded-lg">
@@ -221,42 +296,87 @@ export const CreditCardsView: React.FC<CreditCardsViewProps> = ({ cards, onUpdat
                                 ${isExpanded ? 'max-h-[500px] opacity-100 shadow-inner' : 'max-h-0 opacity-0'}
                             `}>
                                 <div className="p-4 space-y-3">
-                                    {items.length === 0 ? (
+                                    {items.length === 0 && futureItems.length === 0 ? (
                                         <p className="text-center text-slate-400 text-xs py-4">Nenhuma compra nesta fatura.</p>
                                     ) : (
-                                        <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                                            {items.map((item, idx) => (
-                                                <div key={item.id || idx} className="flex justify-between items-center bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-8 h-8 rounded-full bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-                                                            <span className="material-symbols-rounded text-sm notranslate">
-                                                                {item.installments ? 'calendar_month' : 'credit_card'}
+                                        <div className="space-y-4 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
+                                            {/* Itens da Fatura Atual */}
+                                            {items.length > 0 && (
+                                                <div className="space-y-2">
+                                                    {items.map((item, idx) => (
+                                                        <div key={item.id || idx} className="flex justify-between items-center bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="w-8 h-8 rounded-full bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                                                                    <span className="material-symbols-rounded text-sm notranslate">
+                                                                        {item.installments ? 'calendar_month' : 'credit_card'}
+                                                                    </span>
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-sm font-bold text-slate-700 dark:text-white leading-tight">{item.name}</p>
+                                                                    <p className="text-[10px] text-slate-400">
+                                                                        {(item as any).subCategoryName}
+                                                                        {item.installments && ` • Parcelas ${item.installments.current}/${item.installments.total}`}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                            <span className="text-sm font-black text-slate-700 dark:text-white">
+                                                                {item.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                                             </span>
                                                         </div>
-                                                        <div>
-                                                            <p className="text-sm font-bold text-slate-700 dark:text-white leading-tight">{item.name}</p>
-                                                            <p className="text-[10px] text-slate-400">
-                                                                {(item as any).subCategoryName}
-                                                                {item.installments && ` • Parcelas ${item.installments.current}/${item.installments.total}`}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                    <span className="text-sm font-black text-slate-700 dark:text-white">
-                                                        {item.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                                    </span>
+                                                    ))}
                                                 </div>
-                                            ))}
+                                            )}
+
+                                            {/* Itens da PRÓXIMA Fatura (Aparecem aqui para feedback imediato) */}
+                                            {futureItems.length > 0 && (
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center gap-2 px-1">
+                                                        <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700"></div>
+                                                        <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest">
+                                                            Próxima Fatura • {futureTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                        </span>
+                                                        <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700"></div>
+                                                    </div>
+                                                    {futureItems.map((item, idx) => (
+                                                        <div key={`future-${item.id || idx}`} className="flex justify-between items-center bg-amber-50/30 dark:bg-amber-900/10 p-3 rounded-xl border border-amber-100/50 dark:border-amber-900/20 opacity-80">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400">
+                                                                    <span className="material-symbols-rounded text-sm notranslate">fast_forward</span>
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-sm font-bold text-slate-700 dark:text-white leading-tight">{item.name}</p>
+                                                                    <p className="text-[10px] text-amber-600/70 dark:text-amber-400/70 font-bold uppercase">
+                                                                        Lançado para o próximo mês
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                            <span className="text-sm font-black text-slate-700 dark:text-white">
+                                                                {item.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
-                                    <div className="pt-3 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center">
-                                        <button
-                                            onClick={() => handleDeleteCard(card.id)}
-                                            className="text-rose-500 hover:text-rose-600 text-xs font-bold uppercase flex items-center gap-1 hover:bg-rose-50 dark:hover:bg-rose-900/20 px-3 py-2 rounded-lg transition-colors"
-                                        >
-                                            <span className="material-symbols-rounded text-sm">delete</span>
-                                            Excluir Cartão
-                                        </button>
+                                    <div className="pt-3 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center gap-2">
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => handleStartEdit(card)}
+                                                className="text-indigo-500 hover:text-indigo-600 text-xs font-bold uppercase flex items-center gap-1 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 px-3 py-2 rounded-lg transition-colors"
+                                            >
+                                                <span className="material-symbols-rounded text-sm">edit</span>
+                                                Editar
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteCard(card.id)}
+                                                className="text-rose-500 hover:text-rose-600 text-xs font-bold uppercase flex items-center gap-1 hover:bg-rose-50 dark:hover:bg-rose-900/20 px-3 py-2 rounded-lg transition-colors"
+                                            >
+                                                <span className="material-symbols-rounded text-sm">delete</span>
+                                                Excluir
+                                            </button>
+                                        </div>
 
                                         <div className="text-right">
                                             <p className="text-[10px] text-slate-400 font-bold uppercase">Fechamento</p>
@@ -275,6 +395,100 @@ export const CreditCardsView: React.FC<CreditCardsViewProps> = ({ cards, onUpdat
                     <span className="material-symbols-rounded text-6xl text-slate-300 mb-4">credit_card</span>
                     <p className="text-slate-500 font-bold">Nenhum cartão cadastrado</p>
                     <p className="text-xs text-slate-400 mt-1">Clique em "Novo Cartão" para começar a organizar.</p>
+                </div>
+            )}
+
+            {/* Edit Card Modal/Overlay */}
+            {editingCardId && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+                    <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 p-8 space-y-6 animate-scaleIn">
+                        <div className="flex justify-between items-center">
+                            <h3 className="text-xl font-black text-slate-800 dark:text-white">Editar Cartão</h3>
+                            <button 
+                                onClick={() => setEditingCardId(null)}
+                                className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition-colors"
+                            >
+                                <span className="material-symbols-rounded">close</span>
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Nome do Cartão</label>
+                                <input
+                                    type="text"
+                                    value={editName}
+                                    onChange={(e) => setEditName(e.target.value)}
+                                    className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 py-3 font-bold text-slate-700 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                                    placeholder="Ex: Nubank"
+                                />
+                            </div>
+
+                            <div className="flex gap-4">
+                                <div className="flex-1">
+                                    <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Vencimento</label>
+                                    <input
+                                        type="number"
+                                        min="1" max="31"
+                                        value={editDueDay}
+                                        onChange={(e) => setEditDueDay(parseInt(e.target.value))}
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 py-3 font-bold text-slate-700 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                </div>
+                                <div className="flex-1">
+                                    <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Fechamento</label>
+                                    <input
+                                        type="number"
+                                        min="1" max="31"
+                                        value={editClosingDay}
+                                        onChange={(e) => setEditClosingDay(parseInt(e.target.value))}
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 py-3 font-bold text-slate-700 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Dono do Cartão</label>
+                                <select
+                                    value={editOwner}
+                                    onChange={(e) => setEditOwner(e.target.value as any)}
+                                    className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 py-3 font-bold text-slate-700 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                                >
+                                    <option value="pedro">{isPedro ? 'Pedro' : 'Proprietário 1'}</option>
+                                    <option value="izabel">{isPedro ? 'Izabel' : 'Proprietário 2'}</option>
+                                    <option value="joint">Conjunta</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Cor do Cartão</label>
+                                <div className="flex flex-wrap gap-3">
+                                    {CARD_COLORS.map(color => (
+                                        <button
+                                            key={color.class}
+                                            onClick={() => setEditColor(color.class)}
+                                            className={`w-8 h-8 rounded-full ${color.class} transition-all ${editColor === color.class ? 'ring-4 ring-slate-200 dark:ring-slate-700 scale-110' : 'opacity-60 hover:opacity-100 hover:scale-110'}`}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3 pt-2">
+                                <button
+                                    onClick={() => setEditingCardId(null)}
+                                    className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-xl font-bold transition-all active:scale-95"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleUpdateCard}
+                                    className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/30 transition-all active:scale-95"
+                                >
+                                    Salvar Alterações
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

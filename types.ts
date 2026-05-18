@@ -1,9 +1,18 @@
 
+/**
+ * Padrão unificado de recorrência:
+ *   isRecurring      — flag principal. Se true, o item é propagado para meses futuros.
+ *   frequency        — cadência da recorrência. Atualmente apenas 'monthly' é suportado.
+ *   recurrenceLimit  — número de meses que deve durar (contando a partir de `date`).
+ *                      undefined/null = infinito.
+ */
 export interface LineItem {
   id: string;
   name: string;
   value: number;
   isRecurring?: boolean;
+  frequency?: 'monthly'; // Cadência da recorrência (padrão: monthly)
+  recurrenceLimit?: number; // Nº de meses a propagar (undefined = infinito)
   annualRate?: number;
   // Credit Card Fields
   paymentMethod?: 'credit' | 'debit' | 'pix' | 'cash';
@@ -12,10 +21,11 @@ export interface LineItem {
     current: number;
     total: number;
   };
-  date?: string; // ISO Date string YYYY-MM-DD
+  date?: string; // ISO Date string YYYY-MM-DD — âncora para recurrenceLimit
   // Account Fields
   accountId?: string;
   isPaid?: boolean;
+  isIgnored?: boolean;
 }
 
 export interface SubCategory {
@@ -49,6 +59,9 @@ export interface FinancialData {
   additionalVariableCosts: Category;
   cards?: CreditCard[];
   accounts?: Account[];
+  initialBalanceAdjustment?: number;
+  joaoVitorReserve?: number;
+  joaoVitorTarget?: number;
 }
 
 export interface ToastMessage {
@@ -62,6 +75,7 @@ export interface CreditCard {
   color: string;
   dueDay: number;
   closingDay: number;
+  owner?: 'pedro' | 'izabel' | 'joint';
 }
 
 export interface Account {

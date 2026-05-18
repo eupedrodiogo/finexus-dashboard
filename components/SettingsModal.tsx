@@ -1,28 +1,37 @@
 
 import React, { useRef } from 'react';
 import { Modal } from './Modal';
-import { FinancialData, CreditCard } from '../types';
+import { FinancialData, CreditCard, Goal } from '../types';
 import { generateCSV } from '../utils';
 
 interface SettingsModalProps {
     isOpen: boolean;
     onClose: () => void;
     allData: { [key: string]: FinancialData };
+    goals: Goal[];
     userName: string;
     onUpdateUserName: (name: string) => void;
-    onImport: (data: { [key: string]: FinancialData }) => void;
+    onImport: (data: any) => boolean;
     onReset: () => void;
     onForceSync: () => void;
+    onPushSync: () => void;
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, allData, userName, onUpdateUserName, onImport, onReset, onForceSync }) => {
+export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, allData, goals, userName, onUpdateUserName, onImport, onReset, onForceSync, onPushSync }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleExport = () => {
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(allData, null, 2));
+        const backupData = {
+            allData,
+            goals,
+            userName,
+            version: "2.0",
+            timestamp: new Date().toISOString()
+        };
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
         const downloadAnchorNode = document.createElement('a');
         downloadAnchorNode.setAttribute("href", dataStr);
-        downloadAnchorNode.setAttribute("download", `prospera_nexus_backup_${new Date().toISOString().split('T')[0]}.json`);
+        downloadAnchorNode.setAttribute("download", `finexus_backup_${new Date().toISOString().split('T')[0]}.json`);
         document.body.appendChild(downloadAnchorNode);
         downloadAnchorNode.click();
         downloadAnchorNode.remove();
@@ -33,14 +42,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, a
         if (e.target.files && e.target.files[0]) {
             fileReader.readAsText(e.target.files[0], "UTF-8");
             fileReader.onload = (event) => {
-                if (event.target?.result) {
-                    try {
-                        const parsedData = JSON.parse(event.target.result as string);
-                        onImport(parsedData);
+                try {
+                    if (!event.target?.result) throw new Error("Não foi possível ler o arquivo.");
+                    const parsedData = JSON.parse(event.target.result as string);
+                    const success = onImport(parsedData);
+                    if (success) {
                         onClose();
-                    } catch (e) {
-                        alert("Erro ao ler arquivo JSON. Verifique o formato.");
                     }
+                } catch (error) {
+                    console.error("[SettingsModal] Erro ao ler/parsear arquivo:", error);
+                    alert("Erro ao processar o arquivo. Verifique se é um JSON válido.");
                 }
             };
         }
@@ -48,13 +59,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, a
 
     return (
         <Modal isOpen={isOpen} onClose={onClose}>
-            <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="bg-white dark:bg-slate-900 w-full rounded-t-[32px] sm:rounded-3xl p-6 shadow-2xl max-h-[92vh] overflow-y-auto no-scrollbar border-t border-white/10 sm:border-none pointer-events-auto">
                 <div className="flex justify-between items-center mb-6">
                     <div>
                         <h2 className="text-xl font-black text-slate-800 dark:text-white">Configurações</h2>
                         <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Personalização e Dados.</p>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors">
+                    <button onClick={onClose} className="p-3 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors">
                         <span className="material-symbols-rounded notranslate text-slate-400">close</span>
                     </button>
                 </div>
@@ -70,14 +81,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, a
                                     type="text"
                                     value={userName}
                                     onChange={(e) => onUpdateUserName(e.target.value)}
-                                    className="w-full bg-slate-50 dark:bg-slate-800 border-b-2 border-slate-200 dark:border-slate-700 px-3 py-2 text-sm font-bold text-slate-700 dark:text-white focus:border-indigo-500 focus:outline-none transition-colors"
+                                    className="w-full bg-slate-50 dark:bg-slate-800 border-b-2 border-slate-200 dark:border-slate-700 px-3 py-3 text-sm font-bold text-slate-700 dark:text-white focus:border-indigo-500 focus:outline-none transition-colors"
                                     placeholder="Nome da Família"
                                 />
                             </div>
                         </div>
                     </div>
-
-                    <hr className="border-slate-100 dark:border-slate-800/50" />
 
                     <hr className="border-slate-100 dark:border-slate-800/50" />
 
@@ -87,14 +96,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, a
                         <button onClick={onForceSync} className="w-full flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors group border border-blue-100 dark:border-blue-800/30">
                             <div className="flex items-center gap-4">
                                 <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-800 flex items-center justify-center text-blue-600 dark:text-blue-300">
-                                    <span className="material-symbols-rounded notranslate">cloud_sync</span>
+                                    <span className="material-symbols-rounded notranslate">cloud_download</span>
                                 </div>
                                 <div className="text-left">
-                                    <p className="font-bold text-slate-700 dark:text-slate-200">Forçar Sincronização</p>
-                                    <p className="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Baixar dados mais recentes</p>
+                                    <p className="font-bold text-sm text-slate-700 dark:text-slate-200">Baixar da Nuvem</p>
+                                    <p className="text-[11px] text-slate-500 uppercase tracking-wide font-bold">Substituir local pelo servidor</p>
                                 </div>
                             </div>
                             <span className="material-symbols-rounded notranslate text-slate-400 group-hover:rotate-180 transition-transform duration-700">sync</span>
+                        </button>
+
+                        <button onClick={onPushSync} className="w-full flex items-center justify-between p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors group border border-indigo-100 dark:border-indigo-800/30">
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-300">
+                                    <span className="material-symbols-rounded notranslate">cloud_upload</span>
+                                </div>
+                                <div className="text-left">
+                                    <p className="font-bold text-sm text-slate-700 dark:text-slate-200">Salvar na Nuvem</p>
+                                    <p className="text-[11px] text-slate-500 uppercase tracking-wide font-bold">Enviar dados para conta Google</p>
+                                </div>
+                            </div>
+                            <span className="material-symbols-rounded notranslate text-slate-400 group-hover:-translate-y-1 transition-transform">cloud_upload</span>
                         </button>
                     </div>
 
@@ -120,7 +142,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, a
                             const url = URL.createObjectURL(blob);
                             const link = document.createElement("a");
                             link.setAttribute("href", url);
-                            link.setAttribute("download", `prospera_relatorio_${new Date().toISOString().split('T')[0]}.csv`);
+                            link.setAttribute("download", `finexus_relatorio_${new Date().toISOString().split('T')[0]}.csv`);
                             document.body.appendChild(link);
                             link.click();
                             document.body.removeChild(link);
@@ -154,7 +176,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, a
                                 type="file"
                                 ref={fileInputRef}
                                 onChange={handleFileChange}
-                                accept="application/json"
+                                accept=".json"
                                 className="hidden"
                             />
                         </div>

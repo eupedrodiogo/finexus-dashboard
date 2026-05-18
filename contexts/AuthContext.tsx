@@ -8,11 +8,12 @@ import {
     signOut,
     setPersistence,
     browserLocalPersistence,
-    User
+    User,
+    signInWithCredential,
+    GoogleAuthProvider
 } from 'firebase/auth';
 import { auth, googleProvider } from '../firebase';
 import { logDebug } from '../utils/debugLogger';
-
 interface AuthContextType {
     user: User | null;
     loading: boolean;
@@ -40,7 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setLoading(false);
         }).catch((error) => {
             logDebug(`Redirect Login Error: ${error.message}`);
-            alert(`Erro no retorno do login: ${error.message}`);
+            console.error(`Erro no retorno do login: ${error.message}`);
             setLoading(false);
         });
 
@@ -57,19 +58,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             logDebug("Login function called. Setting persistence...");
             await setPersistence(auth, browserLocalPersistence);
 
-            // Check if mobile
-            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-            logDebug(`Device check: isMobile=${isMobile}`);
-
-            if (isMobile) {
-                // Use popup for mobile too, to test persistence/state loss issue
-                logDebug("TESTING: Attempting signInWithPopup on MOBILE...");
-                await signInWithPopup(auth, googleProvider);
-            } else {
-                // Use popup for desktop
-                logDebug("Attempting signInWithPopup...");
-                await signInWithPopup(auth, googleProvider);
-            }
+            // Fallback for Web
+            logDebug("Attempting Web signInWithPopup...");
+            await signInWithPopup(auth, googleProvider);
         } catch (error: any) {
 
             // Helpful alerts for common errors
@@ -85,13 +76,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     }
                 }
             } else if (error.code === 'auth/operation-not-allowed') {
-                alert('Login com Google não está habilitado no Firebase Console.');
+                console.error('Login com Google não está habilitado no Firebase Console.');
                 throw new Error('Login com Google não está habilitado no Firebase Console.');
             } else if (error.code === 'auth/unauthorized-domain') {
-                alert('Este domínio não está autorizado no Firebase Console. Verifique as configurações de autenticação.');
+                console.error('Este domínio não está autorizado no Firebase Console. Verifique as configurações de autenticação.');
                 throw new Error('Este domínio não está autorizado no Firebase Console.');
             } else {
-                alert(`Erro ao fazer login: ${error.message}`);
+                console.error(`Erro ao fazer login: ${error.message}`);
             }
             throw error;
         }
