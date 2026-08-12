@@ -1,10 +1,10 @@
 
 export const firebaseConfig = {
-    projectId: "oprosperanexus",
-    appId: "1:221700729594:web:89ee6bad5dad415ea27743",
-    storageBucket: "oprosperanexus.firebasestorage.app",
-    apiKey: "AIzaSyBoq0fw_FITwsC_EwherRz8XI4IP2tUx1I",
-    authDomain: "oprosperanexus.firebaseapp.com",
-    messagingSenderId: "221700729594",
-    measurementId: "G-RH5Z5LVWV2"
+    projectId: "meufinexus",
+    appId: "1:387957135587:web:d10e45af6ac3534aba0dd6",
+    storageBucket: "meufinexus.firebasestorage.app",
+    apiKey: "AIzaSyD_r3syBZ1QZ1FzioboDnXtsDDfuJKBcDY",
+    authDomain: "meufinexus.firebaseapp.com",
+    messagingSenderId: "387957135587",
+    measurementId: "G-GG76EFJJ96"
 };

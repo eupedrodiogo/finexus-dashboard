@@ -7,6 +7,7 @@ import { ConfirmationModal } from './ConfirmationModal';
 import { ImportModal } from './ImportModal';
 import { checkPendingShare } from '../services/shareService';
 import { MonthNavigator } from './MonthNavigator';
+import { SmartFinancialHealthCard } from './SmartFinancialHealthCard';
 
 interface PlannerViewProps {
     data: FinancialData;
@@ -94,7 +95,7 @@ export const PlannerView: React.FC<PlannerViewProps> = ({
             comparisonLabel={comparisonLabel}
             onItemChange={(subId, itemId, val) => handleValueChange(category.id, subId, itemId, val)}
             onItemNameChange={(subId, itemId, val) => handleNameChange(category.id, subId, itemId, val)}
-            onItemAdd={(subId) => handleAddItem(category.id, subId)}
+            onItemAdd={(subId, newItemId) => handleAddItem(category.id, subId, newItemId)}
             onItemDelete={(subId, itemId) => handleDeleteItem(category.id, subId, itemId)}
             onBulkItemDelete={(subId, itemIds) => handleBulkDeleteItem && handleBulkDeleteItem(category.id, subId, itemIds)}
             onTitleChange={(val) => handleCategoryTitleChange(category.id, val)}
@@ -118,8 +119,8 @@ export const PlannerView: React.FC<PlannerViewProps> = ({
     return (
         <div className="space-y-6 animate-fadeIn pb-10">
             
-            {/* O Card de Saúde Financeira foi movido para o Dashboard para uma visão mais centralizada */}
-
+            {/* Sticky Header Container (Apenas Abas agora, o Grid foi para o App.tsx) */}
+            {/* O cabeçalho fixo com abas e cards foi totalmente movido para App.tsx para evitar problemas de sobreposição de 'sticky' ao rolar a página */}
 
             {/* Categorias - Renderização Condicional por Aba */}
             <div className="animate-slideIn">

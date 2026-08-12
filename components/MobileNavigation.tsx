@@ -10,7 +10,10 @@ interface MobileNavigationProps {
 }
 
 // ── Action items config ────────────────────────────────────────────────────────────
-const ACTION_ITEMS = [
+// Exportado para o FAB do desktop (App.tsx) usar exatamente as mesmas cores,
+// ícones e ordem do menu "Nova Transação" do celular — uma fonte só, sem risco
+// de as duas telas divergirem visualmente com o tempo.
+export const ACTION_ITEMS = [
     { label: 'Despesa',       type: 'expense',     icon: 'arrow_downward', color: '#f43f5e', bg: 'rgba(244,63,94,0.15)', border: 'rgba(244,63,94,0.4)', shadow: 'rgba(244,63,94,0.3)' },
     { label: 'Receita',       type: 'income',      icon: 'arrow_upward',   color: '#10b981', bg: 'rgba(16,185,129,0.15)', border: 'rgba(16,185,129,0.4)', shadow: 'rgba(16,185,129,0.3)' },
     { label: 'Transferir',    type: 'transfer',    icon: 'swap_horiz',     color: '#0ea5e9', bg: 'rgba(14,165,233,0.15)', border: 'rgba(14,165,233,0.4)', shadow: 'rgba(14,165,233,0.3)' },

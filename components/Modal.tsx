@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 interface ModalProps {
@@ -8,6 +8,29 @@ interface ModalProps {
 }
 
 export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children }) => {
+  // Ref para que o efeito dependa apenas de `isOpen` — os callbacks de onClose
+  // são recriados a cada render e reexecutariam o efeito à toa.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  // Fecha com Esc e trava o scroll do fundo enquanto estiver aberto
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCloseRef.current();
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return createPortal(

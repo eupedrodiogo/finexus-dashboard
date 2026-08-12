@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Wallet, Activity, ArrowUpRight, TrendingUp, MinusCircle, Zap } from 'lucide-react';
 import { FinancialData, Goal, ToastMessage, LineItem } from './types';
 import { Dashboard } from './components/Dashboard';
 import { MonthlyView } from './components/MonthlyView';
+import { PlannerView } from './components/PlannerView';
 import { AnnualSummary } from './components/AnnualSummary';
 import { SmartAdvisor } from './components/SmartAdvisor';
 import { InvestmentSimulator } from './components/InvestmentSimulator';
@@ -10,21 +12,24 @@ import { MasterPlan } from './components/MasterPlan';
 import { GoalsModal } from './components/GoalsModal';
 import { SettingsModal } from './components/SettingsModal';
 import { Toast, ToastContainer } from './components/Toast';
-import { calculateTotal, calculateAccountBalance, calculateMonthlyBalance } from './utils';
+import { calculateTotal, calculateRealTotal, calculateAccountBalance, calculateMonthlyBalance, TRANSFER_IN, TRANSFER_OUT, TRANSFER_SUB_NAME } from './utils';
 import { useAuth } from './contexts/AuthContext';
-import { saveUserData, getUserData } from './services/firebaseService';
+import { saveUserData, getUserData, subscribeToUserData } from './services/firebaseService';
 import { InvestmentAdvisor } from './components/InvestmentAdvisor';
 import { MonthNavigator } from './components/MonthNavigator';
 import { CreditCardsView } from './components/CreditCardsView';
 import { AccountsView } from './components/AccountsView';
-import { AddTransactionModal, NewTransactionData } from './components/AddTransactionModal';
-import { MobileNavigation } from './components/MobileNavigation';
+import { AddTransactionModal, NewTransactionData, TransactionType } from './components/AddTransactionModal';
+import { MobileNavigation, ACTION_ITEMS } from './components/MobileNavigation';
 import { OnboardingModal } from './components/OnboardingModal';
 import { InterfaceTour, TourStep } from './components/InterfaceTour';
+import { RecurringDeleteModal, RecurringDeletePayload } from './components/RecurringDeleteModal';
+import { ImportModal } from './components/ImportModal';
 
 // Restored Components
 import { CompactKPIBar } from './components/CompactKPIBar';
-import { TransactionFormScreen } from './components/TransactionFormScreen';
+import { PlannerHeaderCards } from './components/PlannerHeaderCards';
+import { PlannerTabs } from './components/PlannerTabs';
 import { SmartFinancialHealthCard } from './components/SmartFinancialHealthCard';
 import { SavingsCapacityCard } from './components/SavingsCapacityCard';
 import { SpendingEfficiencyCard } from './components/SpendingEfficiencyCard';
@@ -38,16 +43,7 @@ const initialData: FinancialData = {
     headerColor: 'bg-indigo-600',
     subCategories: [
       {
-        id: 'pedroIncome', name: 'Pedro', items: [
-          { id: 'pedroSalario', name: 'salario', value: 2400.00, isRecurring: true },
-          { id: 'pedroTrienio', name: 'trienio', value: 0 },
-        ]
-      },
-      {
-        id: 'izabelIncome', name: 'Izabel', items: [
-          { id: 'izabelSalario', name: 'salario', value: 4027.25, isRecurring: true },
-          { id: 'izabelAlimentacao', name: 'alimentacao', value: 250.00, isRecurring: true },
-        ]
+        id: 'geralIncome', name: 'Geral', items: []
       }
     ]
   },
@@ -57,17 +53,7 @@ const initialData: FinancialData = {
     headerColor: 'bg-rose-600',
     subCategories: [
       {
-        id: 'pedroDeductions', name: 'PEDRO', items: [
-          { id: 'pedroInss', name: 'inss', value: 220.00, isRecurring: true },
-          { id: 'pedroConsignado', name: 'consignado', value: 713.00, isRecurring: true },
-        ]
-      },
-      {
-        id: 'izabelDeductions', name: 'IZABEL', items: [
-          { id: 'izabel**', name: '**', value: 534.86, isRecurring: true },
-          { id: 'izabel***', name: '***', value: 87.83, isRecurring: true },
-          { id: 'izabelConsignado', name: 'consignado', value: 1263.00, isRecurring: true },
-        ]
+        id: 'geralDeductions', name: 'Geral', items: []
       }
     ]
   },
@@ -75,16 +61,10 @@ const initialData: FinancialData = {
     id: 'basicExpenses',
     title: 'DESPESA BÁSICA',
     headerColor: 'bg-slate-700',
-    budget: 2600.00,
+    budget: 0,
     subCategories: [
       {
-        id: 'mainBasic', name: 'Essenciais', items: [
-          { id: 'aluguel', name: 'ALUGUEL', value: 800.00, isRecurring: true },
-          { id: 'compraMes', name: 'compra mês', value: 600.00 },
-          { id: 'combustivel', name: 'combustivel', value: 300.00 },
-          { id: 'energia', name: 'energia', value: 150.00, isRecurring: true },
-          { id: 'internet', name: 'internet', value: 100.00, isRecurring: true },
-        ]
+        id: 'mainBasic', name: 'Essenciais', items: []
       }
     ]
   },
@@ -94,11 +74,7 @@ const initialData: FinancialData = {
     headerColor: 'bg-emerald-600',
     subCategories: [
       {
-        id: 'mainInvest', name: 'Aportes', items: [
-          { id: 'selic1', name: 'Tesouro Selic 2031 (Prot. 9654... e 9653...)', value: 368.58, date: '2026-03-04', isRecurring: false },
-          { id: 'td1', name: 'COMPRA Tesouro Direto 96751588', value: 923.01, date: '2026-03-09', isRecurring: false },
-          { id: 'td2', name: 'COMPRA Tesouro Direto 97018547', value: 1109.51, date: '2026-03-12', isRecurring: false },
-        ]
+        id: 'mainInvest', name: 'Aportes', items: []
       }
     ]
   },
@@ -108,40 +84,37 @@ const initialData: FinancialData = {
     headerColor: 'bg-purple-600',
     subCategories: [
       {
-        id: 'mainVar', name: 'Cartão / Outros', items: [
-          { id: 'ifood', name: 'ifood fim de semana', value: 120.00 },
-          { id: 'uber', name: 'uber', value: 45.00 },
-        ]
+        id: 'mainVar', name: 'Cartão / Outros', items: []
       }
     ]
   },
   cards: [],
-  accounts: [
-    {
-      id: 'inter-joint',
-      name: 'Banco Inter (Conta Conjunta)',
-      type: 'checking',
-      owner: 'joint',
-      initialBalance: 13.90,
-      color: '#ff7a00'
-    }
-  ]
+  accounts: [],
+  joaoVitorReserve: 0,
+  joaoVitorTarget: 0
 };
 
-const initialGoals: Goal[] = [
-  { id: '1', name: 'Reserva de Emergência', targetValue: 30000, currentValue: 12500, deadline: '2025-12-31', color: '#6366f1' },
-  { id: '2', name: 'Viagem Europa', targetValue: 15000, currentValue: 4200, deadline: '2026-06-30', color: '#ec4899' },
-  { id: '3', name: 'Troca de Carro', targetValue: 80000, currentValue: 5000, deadline: '2027-12-31', color: '#10b981' },
-];
+const initialGoals: Goal[] = [];
+
+// FAB do desktop: Despesa é o lançamento mais comum, então o botão principal
+// já a representa no hover (clique direto, sem precisar abrir o menu). Ela
+// também aparece como a ÚLTIMA linha do dropdown — mesma posição em que já
+// está, perto do botão — para não ficar solta, desconectada da caixa.
+const FAB_EXPENSE_ITEM = ACTION_ITEMS.find(i => i.type === 'expense')!;
+const FAB_OTHER_ITEMS  = ACTION_ITEMS.filter(i => i.type !== 'expense');
+const FAB_MENU_ITEMS   = [...FAB_OTHER_ITEMS, FAB_EXPENSE_ITEM];
+
+
 
 export default function App() {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [currentView, setCurrentView] = useState<'dashboard' | 'monthly' | 'annual' | 'advisor' | 'simulator' | 'cards' | 'accounts' | 'masterplan'>(() => {
+  const [currentView, setCurrentView] = useState<'dashboard' | 'monthly' | 'annual' | 'advisor' | 'simulator' | 'cards' | 'accounts' | 'masterplan' | 'planner'>(() => {
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('currentView') as any) || 'dashboard';
     }
     return 'dashboard';
   });
+  const [activeTab, setActiveTab] = useState<'payslip' | 'expenses' | 'investments'>('payslip');
 
   useEffect(() => {
     localStorage.setItem('currentView', currentView);
@@ -150,20 +123,15 @@ export default function App() {
   const [simulatorInitialValues, setSimulatorInitialValues] = useState<{ monthly?: number, initial?: number } | null>(null);
   const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [isAddTransactionModalOpen, setIsAddTransactionModalOpen] = useState(false);
+  const [isPlannerImportOpen, setIsPlannerImportOpen] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isTourActive, setIsTourActive] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [transactionForm, setTransactionForm] = useState<{ isOpen: boolean, type?: 'expense' | 'income' | 'credit_card' | 'transfer' }>({ isOpen: false });
+  const [transactionForm, setTransactionForm] = useState<{ isOpen: boolean, type?: TransactionType }>({ isOpen: false });
   const [isFanOpen, setIsFanOpen] = useState(false);
 
-  // Scroll handler for Executive Header
-  useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 40);
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  // Scroll handler for Executive Header is now tracked directly via main element's onScroll
 
   useEffect(() => {
     const hasSeenOnboarding = localStorage.getItem('hasSeenOnboarding');
@@ -202,78 +170,6 @@ export default function App() {
       migrateCategory(monthData.additionalVariableCosts);
       migrateCategory(monthData.investments);
     });
-
-    // Reference: March 2026 logic
-    const marchKey = Object.keys(migratedData).find(k => k.includes('2026') && k.includes('03')) || '2026 -03 ';
-    
-    // One-time cleanup: Delete months after March 2026 as requested by user
-    Object.keys(migratedData).forEach(monthKey => {
-      const match = monthKey.match(/(\d{4}) -(\d{2}) /);
-      if (match) {
-        const year = parseInt(match[1]);
-        const month = parseInt(match[2]);
-        if (year > 2026 || (year === 2026 && month > 3)) {
-          delete migratedData[monthKey];
-          hasChanges = true;
-        }
-      }
-    });
-
-    const marchData = migratedData[marchKey];
-    if (marchData) {
-      
-      // Migration: Extrato 12-02-2026 a 12-03-2026 PDF (Banco Inter)
-      const marchDataObj = migratedData[marchKey];
-      if (marchDataObj) {
-        let addedExtrato = false;
-        
-        // Add investments
-        const aportesSub = marchDataObj.investments?.subCategories?.find((s: any) => s.id === 'mainInvest');
-        if (aportesSub && !aportesSub.items.some((i: any) => i.name.includes('Tesouro Selic 2031') || i.name.includes('96751588'))) {
-           aportesSub.items.push(
-              { id: 'selic1', name: 'Tesouro Selic 2031 (Prot. 9654... e 9653...)', value: 368.58, date: '2026-03-04', isRecurring: false },
-              { id: 'td1', name: 'COMPRA Tesouro Direto 96751588', value: 923.01, date: '2026-03-09', isRecurring: false },
-              { id: 'td2', name: 'COMPRA Tesouro Direto 97018547', value: 1109.51, date: '2026-03-12', isRecurring: false }
-           );
-           addedExtrato = true;
-        }
-
-        // Add PIX received to Income as additional items since they funded the account
-        const pedroIncomeSub = marchDataObj.payslipIncome?.subCategories?.find((s: any) => s.id === 'pedroIncome');
-        if (pedroIncomeSub && !pedroIncomeSub.items.some((i: any) => i.name.includes('Aporte Inter (PIX)'))) {
-           pedroIncomeSub.items.push(
-              { id: 'pix1-pedro', name: 'Aporte Inter (PIX)', value: 415.00, date: '2026-03-04', isRecurring: false }
-           );
-           addedExtrato = true;
-        }
-
-        const izabelIncomeSub = marchDataObj.payslipIncome?.subCategories?.find((s: any) => s.id === 'izabelIncome');
-        if (izabelIncomeSub && !izabelIncomeSub.items.some((i: any) => i.name.includes('Aportes Inter (PIX)'))) {
-           izabelIncomeSub.items.push(
-              { id: 'pix1-izabel', name: 'Aportes Inter (PIX)', value: 2000.00, date: '2026-03-08', isRecurring: false }
-           );
-           addedExtrato = true;
-        }
-
-        // Ensure Inter account exists
-        if (!marchDataObj.accounts) marchDataObj.accounts = [];
-        if (!marchDataObj.accounts.some((a: any) => a.id === 'inter-joint')) {
-           marchDataObj.accounts.push({
-             id: 'inter-joint',
-             name: 'Banco Inter (Conta Conjunta)',
-             type: 'checking',
-             owner: 'joint',
-             initialBalance: 13.90, // Balance on 12-03-2026
-             color: '#ff7a00'
-           });
-           addedExtrato = true;
-        }
-
-        if (addedExtrato) {
-           hasChanges = true;
-        }
-      }
-    }
 
     if (hasChanges) {
       console.log("Migrating data: Backfilling missing dates...");
@@ -391,9 +287,9 @@ export default function App() {
         return legacyNeo;
       }
 
-      return localStorage.getItem('prosperaNexusUserName') || 'Pedro & Izabel';
+      return localStorage.getItem('prosperaNexusUserName') || 'PRIMEIRO ACESSO';
     }
-    return 'Pedro & Izabel';
+    return 'PRIMEIRO ACESSO';
   });
 
   useEffect(() => {
@@ -480,25 +376,47 @@ export default function App() {
 
   const toggleTheme = () => setIsDarkMode(prev => !prev);
 
-  const getMonthKey = (date: Date) => `${date.getFullYear()} -${String(date.getMonth() + 1).padStart(2, '0')} `;
+  // Formato canônico da chave de mês: 'YYYY-MM'.
+  // Versões anteriores gravavam 'YYYY -MM ' (com espaços), o que nunca batia com as
+  // chaves montadas sem espaço em AnnualSummary e CreditCardsView.
+  const stripSpaces = (value: string) => value.replace(/\s/g, '');
+
+  const getMonthKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 
   // Helper to get previous month key for carry-over logic
   const getPreviousMonthKey = (date: Date) => {
     const prevDate = new Date(date);
     prevDate.setMonth(date.getMonth() - 1);
-    return `${prevDate.getFullYear()} -${String(prevDate.getMonth() + 1).padStart(2, '0')} `;
+    return getMonthKey(prevDate);
   };
 
   const currentMonthKey = getMonthKey(currentDate);
+
+  // Datas de item gravadas a partir da chave antiga herdaram os espaços ('2026 -08 -01')
+  const normalizeMonthData = (monthData: any) => {
+    if (!monthData) return monthData;
+    ['payslipIncome', 'payslipDeductions', 'basicExpenses', 'additionalVariableCosts', 'investments'].forEach(catKey => {
+      monthData[catKey]?.subCategories?.forEach((sub: any) => {
+        sub.items?.forEach((item: any) => {
+          if (typeof item.date === 'string' && /\s/.test(item.date)) {
+            item.date = stripSpaces(item.date);
+          }
+        });
+      });
+    });
+    return monthData;
+  };
 
   const normalizeAllData = (data: any) => {
     if (!data) return {};
     const normalized: any = {};
     Object.keys(data).forEach(key => {
-      // Only keep keys that look like YYYY -MM (our month key format)
-      if (key.match(/^\d{4}\s*-\s*\d{2}/)) {
-        normalized[key] = data[key];
-      }
+      // Aceita o formato atual ('YYYY-MM') e o legado ('YYYY -MM ')
+      if (!key.match(/^\d{4}\s*-\s*\d{2}/)) return;
+      const cleanKey = stripSpaces(key);
+      // Se as duas variantes coexistirem, a já normalizada tem prioridade
+      if (normalized[cleanKey] && key !== cleanKey) return;
+      normalized[cleanKey] = normalizeMonthData(data[key]);
     });
     return normalized;
   };
@@ -532,65 +450,101 @@ export default function App() {
   });
 
   // Sync State
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [hasLoadedFromCloud, setHasLoadedFromCloud] = useState(false);
+  const sessionId = useMemo(() => Math.random().toString(36).substring(2, 15), []);
+  const isUpdatingFromCloudRef = useRef(false);
 
   // Save AllData Effect
   useEffect(() => {
     localStorage.setItem('prosperaNexusAllData', JSON.stringify(allData));
 
-    // Auto-save to Cloud if logged in and NOT currently syncing (avoid overwriting cloud with stale local data)
-    if (user && !isSyncing) {
+    // Auto-save to Cloud if logged in and has loaded initial data
+    if (user && hasLoadedFromCloud) {
+      if (isUpdatingFromCloudRef.current) {
+        // This render was triggered by a cloud update. Don't echo it back!
+        isUpdatingFromCloudRef.current = false;
+        return;
+      }
+
       const timeoutId = setTimeout(() => {
-        saveUserData(user.uid, { allData, goals, userName });
+        saveUserData(user.uid, { allData, goals, userName, lastWriter: sessionId });
       }, 2000); // Debounce saves
       return () => clearTimeout(timeoutId);
     }
-  }, [allData, goals, userName, user, isSyncing]);
+  }, [allData, goals, userName, user, hasLoadedFromCloud, sessionId]);
 
   // Cloud Sync Logic (Extracted for reuse)
   const syncFromCloud = async (isManual = false) => {
     if (!user) return;
 
-    setIsSyncing(true);
     if (isManual) showToast('Iniciando sincronização forçada...', 'info');
-    else showToast('Sincronizando com a nuvem...', 'info');
 
     try {
       const cloudData: any = await getUserData(user.uid);
 
       if (cloudData) {
         // We found data in the cloud! Update local state.
+        isUpdatingFromCloudRef.current = true;
         if (cloudData.allData) setAllData(normalizeAllData(cloudData.allData));
         if (cloudData.goals) setGoals(cloudData.goals);
         if (cloudData.userName) setUserName(cloudData.userName);
-        showToast('Dados atualizados da nuvem!', 'success');
+        if (isManual) showToast('Dados atualizados da nuvem!', 'success');
       } else {
         // No cloud data found.
         if (isManual) {
-          // If manual force sync and no data, maybe we should upload? 
-          // For now, let's just say "No cloud data found, uploading local..."
-          await saveUserData(user.uid, { allData, goals, userName });
+          await saveUserData(user.uid, { allData, goals, userName, lastWriter: sessionId });
           showToast('Nuvem estava vazia. Backup local enviado!', 'success');
-        } else {
-          // First login auto-sync: upload local data
-          await saveUserData(user.uid, { allData, goals, userName });
-          showToast('Backup inicial criado na nuvem!', 'success');
         }
       }
     } catch (error) {
       console.error("Sync error:", error);
       showToast('Erro ao sincronizar. Tente novamente.', 'error');
     } finally {
-      setIsSyncing(false);
+      setHasLoadedFromCloud(true);
     }
   };
 
-  // Initial Cloud Sync Effect
+  // Real-time Cloud Sync Effect (replaces Initial Cloud Sync)
   useEffect(() => {
-    if (user) {
-      syncFromCloud(false);
-    }
-  }, [user]);
+    if (!user) return;
+
+    let isFirstLoad = true;
+
+    const unsubscribe = subscribeToUserData(user.uid, (docSnap) => {
+      if (docSnap.exists()) {
+        const cloudData = docSnap.data();
+        
+        // Ignore echoes of our own local writes to prevent overwriting ongoing typing!
+        if (cloudData.lastWriter === sessionId) {
+          if (isFirstLoad) {
+            setHasLoadedFromCloud(true);
+            isFirstLoad = false;
+          }
+          return;
+        }
+
+        // It's from another device or first load. Update state!
+        isUpdatingFromCloudRef.current = true;
+        if (cloudData.allData) setAllData(normalizeAllData(cloudData.allData));
+        if (cloudData.goals) setGoals(cloudData.goals);
+        if (cloudData.userName) setUserName(cloudData.userName);
+        
+        if (isFirstLoad) {
+          showToast('Dados sincronizados!', 'success');
+          isFirstLoad = false;
+        } else {
+          showToast('Atualizado de outro dispositivo!', 'info');
+        }
+      } else {
+        if (isFirstLoad) {
+          isFirstLoad = false;
+        }
+      }
+      setHasLoadedFromCloud(true);
+    });
+
+    return () => unsubscribe();
+  }, [user, sessionId]);
 
   const handleForceSync = () => {
     syncFromCloud(true);
@@ -625,6 +579,23 @@ export default function App() {
     return JSON.parse(JSON.stringify(initialData));
   }, [allData, currentMonthKey]);
 
+  // Ao propagar, o item mantém o dia do mês original (vencimento do cartão, dia do
+  // aluguel...), limitado ao último dia do mês de destino — dia 31 vira 30 em novembro.
+  const shiftDateToMonth = (isoDate: string | undefined, monthKey: string) => {
+    if (!isoDate || typeof isoDate !== 'string') return isoDate;
+    const day = Number(isoDate.split('-')[2]);
+    const [year, month] = monthKey.split('-').map(Number);
+    if (!day || !year || !month) return `${monthKey}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    return `${monthKey}-${String(Math.min(day, lastDay)).padStart(2, '0')}`;
+  };
+
+  const monthsBetween = (fromMonthKey: string, toMonthKey: string) => {
+    const [fromYear, fromMonth] = fromMonthKey.split('-').map(Number);
+    const [toYear, toMonth] = toMonthKey.split('-').map(Number);
+    return (toYear - fromYear) * 12 + (toMonth - fromMonth);
+  };
+
   const propagateRecurringItemsToFuture = (sourceData: FinancialData, sourceMonthKey: string, fullData: { [key: string]: FinancialData }) => {
     const clonedData = { ...fullData, [sourceMonthKey]: sourceData };
     const sortedKeys = Object.keys(clonedData).sort();
@@ -639,7 +610,7 @@ export default function App() {
       let hasChanges = false;
 
       Object.keys(currentMonth).forEach(catKey => {
-        const cat = currentMonth[catKey as keyof FinancialData];
+        const cat = currentMonth[catKey as keyof FinancialData] as any;
         if (cat?.subCategories) {
           cat.subCategories.forEach((sub: any) => {
             sub.items.forEach((item: any) => {
@@ -649,15 +620,23 @@ export default function App() {
                 if (nextSub) {
                   const exists = nextSub.items.find((ni: any) => ni.id === item.id);
                   if (!exists) {
-                    let nextDate = item.date;
-                    if (nextDate && typeof nextDate === 'string') {
-                      const yearMatch = nextKey.match(/(\d{4})/);
-                      const monthMatch = nextKey.match(/-(\d{2})/);
-                      if (yearMatch && monthMatch) {
-                        nextDate = `${yearMatch[1]}-${monthMatch[1]}-01`;
-                      }
+                    // Âncora da recorrência: fica gravada na cópia para o limite de
+                    // meses contar sempre a partir do lançamento original, e não
+                    // reiniciar a cada mês propagado.
+                    const anchor: string | undefined = item.recurrenceStart || item.date;
+                    if (item.recurrenceLimit && anchor &&
+                        monthsBetween(anchor.slice(0, 7), nextKey) >= item.recurrenceLimit) {
+                      return; // recorrência já cumpriu o número de meses contratado
                     }
-                    nextSub.items.push({ ...item, isPaid: false, date: nextDate });
+
+                    nextSub.items.push({
+                      ...item,
+                      isPaid: false,
+                      // O dia vem da âncora, não da cópia anterior: um vencimento
+                      // dia 31 volta a ser 31 em dezembro depois de virar 30 em novembro.
+                      date: shiftDateToMonth(anchor || item.date, nextKey),
+                      recurrenceStart: anchor,
+                    });
                     hasChanges = true;
                   }
                 }
@@ -725,7 +704,9 @@ export default function App() {
 
           isRecurring: false, // Default to false for imported items
           accountId: item.accountId, // Preserve account link
-          paymentMethod: item.accountId ? 'debit' : undefined // Default to debit/cash if account is linked
+          paymentMethod: item.accountId ? 'debit' : undefined, // Default to debit/cash if account is linked
+          date: item.data || undefined, // Data do documento (nota/recibo/contracheque)
+          isPaid: item.isPaid === true ? true : undefined // Comprovante de pagamento já entra quitado
         });
         itemsAdded++;
       });
@@ -754,12 +735,83 @@ export default function App() {
     }
   };
 
+  // Handle SubCategory Management
+  const handleAddSubCategory = (categoryId: string, name: string) => {
+    const newAllData = JSON.parse(JSON.stringify(allData));
+    const newId = `sub-${Date.now()}`;
+    const newSubCategory = { id: newId, name, items: [] };
+
+    // Update in all months
+    Object.keys(newAllData).forEach(monthKey => {
+      const cat = newAllData[monthKey][categoryId as keyof FinancialData];
+      if (cat && (cat as any).subCategories) {
+        (cat as any).subCategories.push(JSON.parse(JSON.stringify(newSubCategory)));
+      }
+    });
+
+    setAllData(newAllData);
+    showToast('Categoria adicionada com sucesso!', 'success');
+  };
+
+  const handleEditSubCategory = (categoryId: string, subId: string, newName: string) => {
+    const newAllData = JSON.parse(JSON.stringify(allData));
+
+    Object.keys(newAllData).forEach(monthKey => {
+      const cat = newAllData[monthKey][categoryId as keyof FinancialData];
+      if (cat && (cat as any).subCategories) {
+        const sub = (cat as any).subCategories.find((s: any) => s.id === subId);
+        if (sub) {
+          sub.name = newName;
+        }
+      }
+    });
+
+    setAllData(newAllData);
+    showToast('Categoria renomeada!', 'success');
+  };
+
+  const handleDeleteSubCategory = (categoryId: string, subId: string) => {
+    const newAllData = JSON.parse(JSON.stringify(allData));
+
+    Object.keys(newAllData).forEach(monthKey => {
+      const cat = newAllData[monthKey][categoryId as keyof FinancialData];
+      if (cat && (cat as any).subCategories) {
+        const subIndex = (cat as any).subCategories.findIndex((s: any) => s.id === subId);
+        if (subIndex > -1) {
+          const itemsToMove = (cat as any).subCategories[subIndex].items || [];
+          (cat as any).subCategories.splice(subIndex, 1);
+          
+          if (itemsToMove.length > 0) {
+            // Move items to the first available subcategory or create a 'Geral' one
+            if ((cat as any).subCategories.length === 0) {
+              (cat as any).subCategories.push({ id: `geral-${Date.now()}`, name: 'Geral', items: [] });
+            }
+            (cat as any).subCategories[0].items.push(...itemsToMove);
+          }
+        }
+      }
+    });
+
+    setAllData(newAllData);
+    showToast('Categoria excluída.', 'success');
+  };
+
   // NEW FUNCTION: Handle Add Transaction
   const handleAddTransaction = (tx: NewTransactionData) => {
     const newAllData = JSON.parse(JSON.stringify(allData)); // Deep clone to be safe
     let toastMessage = 'Transação adicionada!';
+    // Mês a partir do qual a recorrência é propagada para o futuro
+    let propagateFromKey = '';
 
-    const addLineItem = (targetKey: string, categoryId: string, subId: string, item: Partial<LineItem>) => {
+    const toISO = (d: Date) => d.toISOString().split('T')[0];
+
+    const addLineItem = (
+      targetKey: string,
+      categoryId: string,
+      subId: string,
+      item: Partial<LineItem>,
+      fallbackSubName?: string
+    ) => {
       // Ensure month exists
       if (!newAllData[targetKey]) {
         // Clone structure from initialData if missing
@@ -769,19 +821,71 @@ export default function App() {
       const category = newAllData[targetKey][categoryId as keyof FinancialData];
       if (!category) return; // Should not happen
 
-      const subCategory = category.subCategories.find((s: any) => s.id === subId);
-      if (subCategory) {
-        subCategory.items.push({
-          id: `tx-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          value: 0, // Fallback
-          ...item,
-        } as LineItem);
+      // Meses futuros criados a partir do template podem não ter a subcategoria
+      // escolhida (ex.: parcela que cai lá na frente). Antes o item era descartado
+      // em silêncio; agora a subcategoria é recriada com o mesmo id.
+      let subCategory = category.subCategories.find((s: any) => s.id === subId);
+      if (!subCategory) {
+        const sourceName = (currentData[categoryId as keyof FinancialData] as any)
+          ?.subCategories?.find((s: any) => s.id === subId)?.name;
+        subCategory = { id: subId, name: fallbackSubName || sourceName || 'Geral', items: [] };
+        category.subCategories.push(subCategory);
       }
+
+      subCategory.items.push({
+        id: `tx-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        value: 0, // Fallback
+        ...item,
+      } as LineItem);
     };
 
-    if (tx.paymentMethod === 'credit' && tx.cardId && tx.installments) {
-      const card = newAllData[currentMonthKey]?.cards?.find((c: any) => c.id === tx.cardId) ||
-        initialData.cards?.find(c => c.id === tx.cardId); // Fallback to find card def
+    // --- TRANSFERÊNCIA ENTRE CONTAS ---------------------------------------
+    // Gera duas pernas com o mesmo transferId: saída na conta de origem e
+    // entrada na conta de destino. Ambas ficam marcadas com isTransfer, então
+    // movem o saldo das contas sem virar receita/despesa do mês.
+    if (tx.transactionType === 'transfer') {
+      if (!tx.accountId || !tx.toAccountId || tx.accountId === tx.toAccountId) {
+        showToast('Selecione contas de origem e destino diferentes.', 'error');
+        return;
+      }
+
+      const accountsList = currentData.accounts || [];
+      const fromAccount = accountsList.find(a => a.id === tx.accountId);
+      const toAccount = accountsList.find(a => a.id === tx.toAccountId);
+      const targetKey = getMonthKey(tx.date);
+      const transferId = `transfer-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      const leg: Partial<LineItem> = {
+        value: tx.amount,
+        date: toISO(tx.date),
+        paymentMethod: tx.paymentMethod,
+        isTransfer: true,
+        transferId,
+        isPaid: tx.isPaid !== undefined ? tx.isPaid : true,
+        isRecurring: tx.isRecurring || false,
+        recurrenceLimit: tx.recurrenceLimit,
+        recurrenceStart: tx.isRecurring ? toISO(tx.date) : undefined,
+      };
+
+      addLineItem(targetKey, TRANSFER_OUT.categoryId, TRANSFER_OUT.subId, {
+        ...leg,
+        name: `${tx.description} → ${toAccount?.name || 'Destino'}`,
+        accountId: tx.accountId,
+      }, TRANSFER_SUB_NAME);
+
+      addLineItem(targetKey, TRANSFER_IN.categoryId, TRANSFER_IN.subId, {
+        ...leg,
+        name: `${tx.description} ← ${fromAccount?.name || 'Origem'}`,
+        accountId: tx.toAccountId,
+      }, TRANSFER_SUB_NAME);
+
+      toastMessage = `Transferência de ${fromAccount?.name || 'origem'} para ${toAccount?.name || 'destino'} registrada!`;
+      propagateFromKey = targetKey;
+
+    // --- CARTÃO DE CRÉDITO -------------------------------------------------
+    } else if (tx.paymentMethod === 'credit' && tx.cardId && tx.installments) {
+      const card = (newAllData[currentMonthKey]?.cards || currentData.cards || [])
+        .find((c: any) => c.id === tx.cardId);
 
       if (!card) {
         showToast('Erro: Cartão não encontrado.', 'error');
@@ -792,7 +896,7 @@ export default function App() {
       // Logic to find First Due Month
       // If purchase day >= closingDay, it goes to next month relative to purchase date
       let refMonth = purchaseDate.getMonth();
-      let refYear = purchaseDate.getFullYear();
+      const refYear = purchaseDate.getFullYear();
 
       if (purchaseDate.getDate() >= card.closingDay) {
         refMonth++; // Move to next month cycle
@@ -800,19 +904,23 @@ export default function App() {
 
       // Now calculate the specific Due Date based on Due Day vs Closing Day
       // If Due Day < Closing Day (e.g. Closing 25th, Due 5th), the due date is in the month AFTER the cycle closes.
-      // e.g. Cycle closes Jan 25th. Due date is Feb 5th. 
+      // e.g. Cycle closes Jan 25th. Due date is Feb 5th.
       // If refMonth is Jan (from cycle calc above), then Due Month is Feb.
       if (card.dueDay < card.closingDay) {
         refMonth++;
       }
 
-      // Create base date for calculation
-      let currentDueDate = new Date(refYear, refMonth, card.dueDay);
+      // Vencimento no dia do cartão, sem estourar o mês (dia 31 em mês de 30 dias
+      // viraria o dia 1º do mês seguinte e jogaria a parcela na fatura errada).
+      const dueDateFor = (offset: number) => {
+        const lastDay = new Date(refYear, refMonth + offset + 1, 0).getDate();
+        return new Date(refYear, refMonth + offset, Math.min(card.dueDay, lastDay));
+      };
+
+      const isSubscription = tx.installments === 1 && !!tx.isRecurring;
 
       for (let i = 0; i < tx.installments; i++) {
-        const installmentDate = new Date(currentDueDate);
-        installmentDate.setMonth(currentDueDate.getMonth() + i);
-
+        const installmentDate = dueDateFor(i);
         const targetKey = getMonthKey(installmentDate);
         const label = tx.installments > 1 ? `${tx.description} (${i + 1}/${tx.installments})` : tx.description;
 
@@ -822,14 +930,26 @@ export default function App() {
           paymentMethod: 'credit',
           cardId: tx.cardId,
           installments: { current: i + 1, total: tx.installments },
-          date: installmentDate.toISOString().split('T')[0] // Persist installment date
+          date: toISO(installmentDate), // Persist installment date
+          isPaid: tx.isPaid || false,
+          isIgnored: tx.isIgnored || false,
+          // Parcelamento já ocupa os meses futuros; só compra à vista recorrente
+          // (assinatura no cartão) precisa ser propagada.
+          isRecurring: isSubscription,
+          recurrenceLimit: isSubscription ? tx.recurrenceLimit : undefined,
+          recurrenceStart: isSubscription ? toISO(installmentDate) : undefined,
         });
-      }
-      toastMessage = `Compra lançada em ${tx.installments}x no ${card.name}!`;
 
+        if (i === 0) propagateFromKey = targetKey;
+      }
+      toastMessage = tx.installments > 1
+        ? `Compra lançada em ${tx.installments}x no ${card.name}!`
+        : `Compra lançada no ${card.name}!`;
+
+    // --- DÉBITO / PIX / DINHEIRO ------------------------------------------
     } else {
       // Debit / Cash / Pix
-      // Use the selected date's month or current view? 
+      // Use the selected date's month or current view?
       // Ideally use the selected date in the modal.
       const targetViewKey = getMonthKey(tx.date);
       addLineItem(targetViewKey, tx.categoryId, tx.subCategoryId, {
@@ -837,17 +957,21 @@ export default function App() {
         value: tx.amount,
         paymentMethod: tx.paymentMethod,
         accountId: tx.accountId,
-        date: tx.date.toISOString().split('T')[0], // Persist transaction date
-        isRecurring: tx.isRecurring || false
+        date: toISO(tx.date), // Persist transaction date
+        isRecurring: tx.isRecurring || false,
+        isPaid: tx.isPaid !== undefined ? tx.isPaid : false,
+        isIgnored: tx.isIgnored || false,
+        recurrenceLimit: tx.recurrenceLimit,
+        recurrenceStart: tx.isRecurring ? toISO(tx.date) : undefined
       });
-      
-      const finalData = propagateRecurringItemsToFuture(newAllData[targetViewKey], targetViewKey, newAllData);
-      setAllData(finalData);
-      showToast(toastMessage, 'success');
-      return; // Skip normal setAllData below
+      propagateFromKey = targetViewKey;
     }
 
-    setAllData(newAllData);
+    if (propagateFromKey && newAllData[propagateFromKey]) {
+      setAllData(propagateRecurringItemsToFuture(newAllData[propagateFromKey], propagateFromKey, newAllData));
+    } else {
+      setAllData(newAllData);
+    }
     showToast(toastMessage, 'success');
   };
 
@@ -875,19 +999,181 @@ export default function App() {
     updateData({ ...currentData, [categoryId]: { ...category, subCategories: newSubCategories } });
   };
 
+  // --- Ações em Massa ---
+  // `updates` aceita um objeto (aplicado a todos) ou uma função (calculado por item,
+  // usado por reajustes percentuais que dependem do valor atual de cada item).
+  const bulkUpdateItems = (
+    categoryId: keyof FinancialData,
+    subCategoryId: string,
+    itemIds: string[],
+    updates: Partial<LineItem> | ((item: LineItem) => Partial<LineItem>)
+  ) => {
+    if (!itemIds || itemIds.length === 0) return;
+    const category = currentData[categoryId] as any;
+    if (!category?.subCategories) return;
+
+    const ids = new Set(itemIds);
+    const newSubCategories = category.subCategories.map((sub: any) => {
+      if (sub.id !== subCategoryId) return sub;
+      return {
+        ...sub,
+        items: sub.items.map((item: LineItem) =>
+          ids.has(item.id)
+            ? { ...item, ...(typeof updates === 'function' ? updates(item) : updates) }
+            : item
+        )
+      };
+    });
+
+    updateData({ ...currentData, [categoryId]: { ...category, subCategories: newSubCategories } });
+  };
+
+  const getSelectedItems = (categoryId: string, subCategoryId: string, itemIds: string[]): LineItem[] => {
+    const category = currentData[categoryId as keyof FinancialData] as any;
+    const sub = category?.subCategories?.find((s: any) => s.id === subCategoryId);
+    if (!sub) return [];
+    return sub.items.filter((i: LineItem) => itemIds.includes(i.id));
+  };
+
+  const handleBulkUpdate = (categoryId: string, subCategoryId: string, itemIds: string[], updates: any) => {
+    if (!itemIds || itemIds.length === 0) return;
+    bulkUpdateItems(categoryId as keyof FinancialData, subCategoryId, itemIds, updates);
+    showToast(`${itemIds.length} ${itemIds.length === 1 ? 'item atualizado' : 'itens atualizados'}.`, 'success');
+  };
+
+  // Alterna: se todos já estão ignorados, volta a contabilizar; senão, ignora todos.
+  const handleBulkIgnore = (categoryId: string, subCategoryId: string, itemIds: string[]) => {
+    const selected = getSelectedItems(categoryId, subCategoryId, itemIds);
+    if (selected.length === 0) return;
+
+    const nextIgnored = !selected.every(i => i.isIgnored);
+    bulkUpdateItems(categoryId as keyof FinancialData, subCategoryId, itemIds, { isIgnored: nextIgnored });
+    showToast(
+      nextIgnored
+        ? `${selected.length} ${selected.length === 1 ? 'item ignorado' : 'itens ignorados'} nos cálculos.`
+        : `${selected.length} ${selected.length === 1 ? 'item voltou' : 'itens voltaram'} a contar.`,
+      'info'
+    );
+  };
+
+  // --- Exclusão com alcance multi-mês ---
+  // Itens recorrentes são propagados para os meses futuros mantendo o mesmo id,
+  // então apagar só o mês atual deixava cópias órfãs adiante.
+  const findAffectedMonths = (categoryId: string, subCategoryId: string, itemIds: string[]) => {
+    const ids = new Set(itemIds);
+    const months = new Set<string>();
+
+    const hasAnyItem = (monthData: any) => {
+      const sub = monthData?.[categoryId]?.subCategories?.find((s: any) => s.id === subCategoryId);
+      return !!sub?.items?.some((i: LineItem) => ids.has(i.id));
+    };
+
+    // O mês atual pode ser derivado do anterior e ainda não existir em allData
+    if (hasAnyItem(currentData)) months.add(currentMonthKey);
+    Object.keys(allData).forEach(mk => { if (hasAnyItem(allData[mk])) months.add(mk); });
+
+    return [...months].sort();
+  };
+
+  const applyDeleteAcrossMonths = (categoryId: string, subCategoryId: string, itemIds: string[], monthKeys: string[]) => {
+    const ids = new Set(itemIds);
+
+    const removeFrom = (monthData: FinancialData) => {
+      const category = (monthData as any)[categoryId];
+      if (!category?.subCategories) return monthData;
+      const newSubCategories = category.subCategories.map((sub: any) =>
+        sub.id === subCategoryId
+          ? { ...sub, items: sub.items.filter((i: LineItem) => !ids.has(i.id)) }
+          : sub
+      );
+      return { ...monthData, [categoryId]: { ...category, subCategories: newSubCategories } };
+    };
+
+    // Não passa por updateData de propósito: propagar aqui reinseriria o que acabou de sair.
+    setAllData(prev => {
+      const next = { ...prev };
+      monthKeys.forEach(mk => {
+        if (mk === currentMonthKey) {
+          next[mk] = removeFrom(currentData) as FinancialData;
+        } else if (next[mk]) {
+          next[mk] = removeFrom(next[mk]) as FinancialData;
+        }
+      });
+      return next;
+    });
+  };
+
+  const [deleteRequest, setDeleteRequest] = useState<{
+    categoryId: string;
+    subCategoryId: string;
+    itemIds: string[];
+    itemName: string;
+    itemDate?: string;
+    affectedMonths: string[];
+  } | null>(null);
+
+  const requestDeleteItems = (categoryId: string, subCategoryId: string, itemIds: string[]) => {
+    if (!itemIds || itemIds.length === 0) return;
+
+    const affectedMonths = findAffectedMonths(categoryId, subCategoryId, itemIds);
+    const otherMonths = affectedMonths.filter(m => m !== currentMonthKey);
+
+    // Existe só no mês atual: nada a perguntar
+    if (otherMonths.length === 0) {
+      applyDeleteAcrossMonths(categoryId, subCategoryId, itemIds, [currentMonthKey]);
+      showToast(`${itemIds.length} ${itemIds.length === 1 ? 'item excluído' : 'itens excluídos'}.`, 'success');
+      return;
+    }
+
+    const sub = (currentData as any)[categoryId]?.subCategories?.find((s: any) => s.id === subCategoryId);
+    const items = sub?.items?.filter((i: LineItem) => itemIds.includes(i.id)) || [];
+
+    setDeleteRequest({
+      categoryId,
+      subCategoryId,
+      itemIds,
+      itemName: items.length === 1 ? items[0].name : `${itemIds.length} itens selecionados`,
+      itemDate: items[0]?.date,
+      affectedMonths
+    });
+  };
+
+  const handleConfirmRecurringDelete = (payload: RecurringDeletePayload) => {
+    if (!deleteRequest) return;
+    const { categoryId, subCategoryId, itemIds, affectedMonths } = deleteRequest;
+
+    let months: string[];
+    if (payload.mode === 'single') {
+      months = [currentMonthKey];
+    } else if (payload.mode === 'from-here') {
+      months = affectedMonths.filter(m => m >= currentMonthKey);
+    } else {
+      months = payload.selectedMonths || [];
+    }
+
+    if (months.length > 0) {
+      applyDeleteAcrossMonths(categoryId, subCategoryId, itemIds, months);
+      showToast(
+        months.length === 1
+          ? `${itemIds.length} ${itemIds.length === 1 ? 'item excluído' : 'itens excluídos'} deste mês.`
+          : `Excluído de ${months.length} meses.`,
+        'success'
+      );
+    }
+
+    setDeleteRequest(null);
+  };
+
+  const handleBulkDeleteItem = (categoryId: string, subCategoryId: string, itemIds: string[]) => {
+    requestDeleteItems(categoryId, subCategoryId, itemIds);
+  };
+
   const handleSubCategoryNameChange = (categoryId: keyof FinancialData, subCategoryId: string, newName: string) => {
     const category = currentData[categoryId];
     const newSubCategories = category.subCategories.map(sub =>
       sub.id === subCategoryId ? { ...sub, name: newName } : sub
     );
     updateData({ ...currentData, [categoryId]: { ...category, subCategories: newSubCategories } });
-  };
-
-  const handleDeleteSubCategory = (categoryId: keyof FinancialData, subCategoryId: string) => {
-    const category = currentData[categoryId];
-    const newSubCategories = category.subCategories.filter(sub => sub.id !== subCategoryId);
-    updateData({ ...currentData, [categoryId]: { ...category, subCategories: newSubCategories } });
-    showToast('Subcategoria removida.', 'info');
   };
 
   const totals = useMemo(() => {
@@ -899,12 +1185,13 @@ export default function App() {
     const investments = calculateTotal(currentData.investments);
     const totalExpenses = basicExpenses + additionalVariableCosts;
 
-    // Real Calculations (isPaid === true)
-    const realGrossIncome = (currentData.payslipIncome?.subCategories?.reduce((acc, sub) => acc + (sub.items?.reduce((s, i) => s + (i.isPaid ? i.value : 0), 0) || 0), 0)) || 0;
-    const realDeductions = (currentData.payslipDeductions?.subCategories?.reduce((acc, sub) => acc + (sub.items?.reduce((s, i) => s + (i.isPaid ? i.value : 0), 0) || 0), 0)) || 0;
-    const realBasicExpenses = (currentData.basicExpenses?.subCategories?.reduce((acc, sub) => acc + (sub.items?.reduce((s, i) => s + (i.isPaid ? i.value : 0), 0) || 0), 0)) || 0;
-    const realVars = (currentData.additionalVariableCosts?.subCategories?.reduce((acc, sub) => acc + (sub.items?.reduce((s, i) => s + (i.isPaid ? i.value : 0), 0) || 0), 0)) || 0;
-    const realInvest = (currentData.investments?.subCategories?.reduce((acc, sub) => acc + (sub.items?.reduce((s, i) => s + (i.isPaid ? i.value : 0), 0) || 0), 0)) || 0;
+    // Real Calculations (isPaid === true) — calculateRealTotal descarta itens
+    // ignorados e pernas de transferência, igual ao planejado acima.
+    const realGrossIncome = calculateRealTotal(currentData.payslipIncome);
+    const realDeductions = calculateRealTotal(currentData.payslipDeductions);
+    const realBasicExpenses = calculateRealTotal(currentData.basicExpenses);
+    const realVars = calculateRealTotal(currentData.additionalVariableCosts);
+    const realInvest = calculateRealTotal(currentData.investments);
     const realTotalExpenses = realBasicExpenses + realVars;
     const realNetIncome = realGrossIncome - realDeductions;
 
@@ -923,7 +1210,7 @@ export default function App() {
     // Calculate Accumulated Previous Balance
     const sortedKeys = Object.keys(allData).sort();
     let previousBalance = 0;
-    const currentRealMonthKey = new Date().toISOString().slice(0, 7);
+    const currentRealMonthKey = getMonthKey(new Date());
     const earliestSavedKey = sortedKeys.length > 0 ? sortedKeys[0] : null;
     const startKey = (earliestSavedKey && earliestSavedKey < currentRealMonthKey) ? earliestSavedKey : currentRealMonthKey;
     const debugSteps: string[] = [];
@@ -933,12 +1220,10 @@ export default function App() {
       const [targetYear, targetMonth] = currentMonthKey.split('-').map(Number);
       let iteratorDate = new Date(startYear, startMonth - 1, 2);
       const targetDate = new Date(targetYear, targetMonth - 1, 2);
-      const normalizedDataMap: Record<string, FinancialData> = {};
-      Object.keys(allData).forEach(key => normalizedDataMap[key.replace(/\s/g, '')] = allData[key]);
 
       while (iteratorDate < targetDate) {
-        const loopKey = `${iteratorDate.getFullYear()}-${String(iteratorDate.getMonth() + 1).padStart(2, '0')}`;
-        const monthData = normalizedDataMap[loopKey] || initialData;
+        const loopKey = getMonthKey(iteratorDate);
+        const monthData = allData[loopKey] || initialData;
         const monthlyResult = calculateMonthlyBalance(monthData);
         previousBalance += monthlyResult;
         debugSteps.push(`Mês: ${loopKey} | Res: ${monthlyResult.toFixed(2)} | Acum: ${previousBalance.toFixed(2)}`);
@@ -990,7 +1275,17 @@ export default function App() {
           goals={goals}
           onManageGoals={() => setIsGoalsModalOpen(true)}
           onImport={handleSmartImport}
+          onFullRestore={({ allData: restoredData, goals: restoredGoals }) => {
+            handleImportData(restoredData);
+            if (restoredGoals) setGoals(restoredGoals);
+          }}
           accountsTotal={accountsTotal}
+          isDarkMode={isDarkMode}
+          toggleTheme={toggleTheme}
+          onPreviousMonth={() => handleMonthChange('prev')}
+          onNextMonth={() => handleMonthChange('next')}
+          userName={userName}
+          isSyncing={!!user}
         />;
       case 'monthly':
         return <MonthlyView
@@ -1006,11 +1301,7 @@ export default function App() {
             const subCats = catData.subCategories.map(s => s.id === subId ? { ...s, items: [...s.items, { id: `item-${Date.now()}`, name: 'Novo Item', value: 0 }] } : s);
             updateData({ ...currentData, [cat]: { ...catData, subCategories: subCats } });
           }}
-          handleDeleteItem={(cat: any, subId: any, itemId: any) => {
-            const catData = currentData[cat as keyof FinancialData];
-            const subCats = catData.subCategories.map(s => s.id === subId ? { ...s, items: s.items.filter(i => i.id !== itemId) } : s);
-            updateData({ ...currentData, [cat]: { ...catData, subCategories: subCats } });
-          }}
+          handleDeleteItem={(cat: any, subId: any, itemId: any) => requestDeleteItems(cat, subId, [itemId])}
           handleValueChange={(cat: any, subId: any, itemId: any, val: any) => updateItem(cat, subId, itemId, { value: val })}
           handleNameChange={(cat: any, sub: any, id: any, val: any) => updateItem(cat, sub, id, { name: val })}
           handleCategoryTitleChange={(cat: any, val: any) => updateData({ ...currentData, [cat]: { ...currentData[cat], title: val } })}
@@ -1041,7 +1332,7 @@ export default function App() {
           cards={currentData.cards || []}
           onUpdateCards={(newCards) => updateData({ ...currentData, cards: newCards })}
           allData={allData}
-          currentMonth={currentDate.toISOString().slice(0, 7)}
+          currentMonth={currentMonthKey}
         />;
       case 'accounts':
         return <AccountsView
@@ -1066,6 +1357,50 @@ export default function App() {
           onShowToast={showToast}
         />;
 */}
+      case 'planner':
+        return <PlannerView
+          data={currentData}
+          totals={totals}
+          handleValueChange={updateItem}
+          handleNameChange={(cat: any, sub: any, id: any, val: any) => updateItem(cat, sub, id, { name: val })}
+          handleCategoryTitleChange={(cat: any, val: any) => updateData({ ...currentData, [cat]: { ...currentData[cat], title: val } })}
+          handleBudgetChange={(cat: any, val: any) => updateData({ ...currentData, [cat]: { ...currentData[cat], budget: val } })}
+          handleRateChange={(cat: any, sub: any, id: any, val: any) => updateItem(cat, sub, id, { annualRate: val })}
+          handleAddItem={(cat, subId, newItemId?: string) => {
+            const catData = currentData[cat as keyof FinancialData];
+            const subCats = catData.subCategories.map(s => s.id === subId ? { ...s, items: [...s.items, { id: newItemId || `item-${Date.now()}`, name: 'Novo Item', value: 0 }] } : s);
+            updateData({ ...currentData, [cat]: { ...catData, subCategories: subCats } });
+          }}
+          handleDeleteItem={(cat: any, subId: any, itemId: any) => requestDeleteItems(cat, subId, [itemId])}
+          handleToggleRecurring={(cat: any, subId: any, itemId: any) => {
+            const item = currentData[cat as keyof FinancialData].subCategories.find(s => s.id === subId)?.items.find(i => i.id === itemId);
+            if (item) updateItem(cat as keyof FinancialData, subId, itemId, { isRecurring: !item.isRecurring });
+          }}
+          handleTogglePaid={(cat: any, subId: any, itemId: any) => {
+            const item = currentData[cat as keyof FinancialData].subCategories.find(s => s.id === subId)?.items.find(i => i.id === itemId);
+            if (item) updateItem(cat as keyof FinancialData, subId, itemId, { isPaid: !item.isPaid });
+          }}
+          handleToggleIgnored={(cat: any, subId: any, itemId: any) => {
+            const item = currentData[cat as keyof FinancialData].subCategories.find(s => s.id === subId)?.items.find(i => i.id === itemId);
+            if (item) updateItem(cat as keyof FinancialData, subId, itemId, { isIgnored: !item.isIgnored });
+          }}
+          handleBulkDeleteItem={handleBulkDeleteItem}
+          handleBulkIgnore={handleBulkIgnore}
+          handleBulkUpdate={handleBulkUpdate}
+          itemToDelete={null}
+          onConfirmDelete={() => { }}
+          onCancelDelete={() => { }}
+          handleSubCategoryNameChange={handleSubCategoryNameChange}
+          handleDeleteSubCategory={handleDeleteSubCategory}
+          onUpdateItem={updateItem}
+          currentMonth={currentDate}
+          onPreviousMonth={() => handleMonthChange('prev')}
+          onNextMonth={() => handleMonthChange('next')}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          isScrolled={isScrolled}
+          isPedro={userName !== 'Visitante' && userName.toLowerCase().includes('pedro')}
+        />;
       case 'masterplan':
         return <MasterPlan isDarkMode={isDarkMode} />;
       default: return null;
@@ -1078,7 +1413,7 @@ export default function App() {
       {/* Desktop Sidebar - Hidden on mobile */}
       <aside
         id="sidebar-nav"
-        className="hidden md:flex flex-col w-72 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300"
+        className="hidden md:flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 shrink-0"
       >
         <Sidebar
           currentView={currentView}
@@ -1091,56 +1426,84 @@ export default function App() {
           isDarkMode={isDarkMode}
           toggleTheme={toggleTheme}
           onOpenSettings={() => setIsSettingsModalOpen(true)}
-          userName={userName}
+          userName={userName + " (v2.2)"}
         />
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto w-full transition-all duration-500 pb-24 md:pb-6">
+      <main 
+        onScroll={(e) => setIsScrolled(e.currentTarget.scrollTop > 20)}
+        className="flex-1 overflow-y-auto w-full transition-all duration-500 pb-24 md:pb-6"
+      >
         <div className="max-w-[1600px] w-full p-4 md:p-10 transition-all duration-500">
 
-          <header 
-            data-scrolled={isScrolled}
-            className="sticky top-0 z-30 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-md border-b border-transparent data-[scrolled=true]:border-slate-200 dark:data-[scrolled=true]:border-slate-800 data-[scrolled=true]:shadow-sm -mx-4 md:-mx-10 px-4 md:px-10 py-4 transition-all duration-300"
-          >
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div className="flex items-center gap-4">
-                <div className="transition-all duration-500 transform data-[scrolled=true]:scale-90">
-                  <h1 className="text-2xl md:text-3xl font-extrabold text-slate-800 dark:text-white tracking-tight flex items-center gap-3">
-                    <span className="md:hidden w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white text-xs">F</span>
-                    {currentView === 'dashboard' ? `Dashboard` :
-                      currentView === 'monthly' ? 'Lançamentos' :
+          {currentView !== 'dashboard' && (
+            <header 
+              data-scrolled={isScrolled}
+              className="sticky top-0 z-30 bg-slate-50 dark:bg-slate-950 -mx-4 md:-mx-10 px-4 md:px-10 -mt-4 pt-4 md:-mt-10 md:pt-10 pb-4 transition-all duration-300"
+            >
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="transition-all duration-500 transform data-[scrolled=true]:scale-90">
+                    <h1 className="text-2xl md:text-3xl font-extrabold text-slate-800 dark:text-white tracking-tight flex items-center gap-3">
+                      <span className="md:hidden w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white text-xs">F</span>
+                      {currentView === 'monthly' ? 'Lançamentos' :
                         currentView === 'annual' ? 'Relatórios' :
                           currentView === 'cards' ? 'Cartões' :
-                            currentView === 'accounts' ? 'Contas' : ''}
-                  </h1>
+                            currentView === 'accounts' ? 'Contas' :
+                              currentView === 'planner' ? 'Estratégia' : ''}
+                    </h1>
+                  </div>
+
+                  {/* 💻 Importação Inteligente (Desktop) — contracheque (entrada) ou nota/recibo (saída) */}
+                  {currentView === 'planner' && (
+                    <button
+                      onClick={() => setIsPlannerImportOpen(true)}
+                      className="hidden md:flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-2xl shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/35 transition-all font-black text-xs uppercase tracking-wider"
+                    >
+                      <span className="material-symbols-rounded text-base notranslate">upload_file</span>
+                      Importar Extrato
+                    </button>
+                  )}
                 </div>
-                
-                {/* Desktop Sticky KPI Bar */}
-                <div className={`hidden lg:block transition-all duration-500 ${isScrolled ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
-                  <CompactKPIBar totals={totals} />
+
+                <div className="flex items-center gap-3 w-full md:w-auto">
+                  <div className="flex-1 md:flex-none">
+                    <MonthNavigator
+                      currentMonth={currentDate}
+                      onPrevious={() => handleMonthChange('prev')}
+                      onNext={() => handleMonthChange('next')}
+                    />
+                  </div>
+
+                  {/* 📱 Importação Inteligente (Mobile — botão compacto) */}
+                  {currentView === 'planner' && (
+                    <button
+                      onClick={() => setIsPlannerImportOpen(true)}
+                      aria-label="Importar extrato"
+                      className="md:hidden w-10 h-10 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20"
+                    >
+                      <span className="material-symbols-rounded text-xl notranslate">upload_file</span>
+                    </button>
+                  )}
+
+                  <button onClick={toggleTheme} className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-400 shadow-sm">
+                    <span className="material-symbols-rounded text-xl">{isDarkMode ? 'light_mode' : 'dark_mode'}</span>
+                  </button>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 w-full md:w-auto">
-                <div className="flex-1 md:flex-none">
-                  <MonthNavigator
-                    currentMonth={currentDate}
-                    onPrevious={() => handleMonthChange('prev')}
-                    onNext={() => handleMonthChange('next')}
-                  />
+              {/* Mobile Sticky KPI Bar REMOVED */}
+              
+              {/* Main KPI Grid - Sticky in Header for Planner View */}
+              {currentView === 'planner' && (
+                <div className={`mt-4 transition-all duration-500`}>
+                    <PlannerHeaderCards totals={totals} isScrolled={isScrolled} />
+                    <PlannerTabs activeTab={activeTab} setActiveTab={setActiveTab} isScrolled={isScrolled} />
                 </div>
-                <button onClick={toggleTheme} className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-400 shadow-sm">
-                  <span className="material-symbols-rounded text-xl">{isDarkMode ? 'light_mode' : 'dark_mode'}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Mobile Sticky KPI Bar */}
-            <div className={`lg:hidden mt-4 transition-all duration-500 ${isScrolled ? 'opacity-100 h-auto' : 'opacity-0 h-0 overflow-hidden pointer-events-none'}`}>
-              <CompactKPIBar totals={totals} />
-            </div>
-          </header>
+              )}
+            </header>
+          )}
 
           <div className="py-6">
             {renderContent()}
@@ -1153,6 +1516,7 @@ export default function App() {
         currentView={currentView}
         onChangeView={setCurrentView}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
+        onOpenAddTransaction={(type) => setTransactionForm({ isOpen: true, type: type as TransactionType })}
       />
 
       <GoalsModal
@@ -1175,12 +1539,37 @@ export default function App() {
         onForceSync={handleForceSync}
       />
 
-      <AddTransactionModal
-        isOpen={isAddTransactionModalOpen}
-        onClose={() => setIsAddTransactionModalOpen(false)}
-        currentData={currentData}
-        onAddTransaction={handleAddTransaction}
-      />
+      {/* Importação Inteligente a partir da Estratégia (contracheque = entrada, nota/recibo = saída) */}
+      {isPlannerImportOpen && (
+        <ImportModal
+          isOpen={isPlannerImportOpen}
+          onClose={() => setIsPlannerImportOpen(false)}
+          onImport={(data) => {
+            handleSmartImport(data);
+            setIsPlannerImportOpen(false);
+          }}
+          onFullRestore={({ allData: restoredData, goals: restoredGoals }) => {
+            handleImportData(restoredData);
+            if (restoredGoals) setGoals(restoredGoals);
+            setIsPlannerImportOpen(false);
+          }}
+          accounts={currentData.accounts}
+        />
+      )}
+
+      {transactionForm.isOpen && (
+        <AddTransactionModal
+          isOpen={transactionForm.isOpen}
+          onClose={() => setTransactionForm({ isOpen: false })}
+          initialType={transactionForm.type}
+          currentData={currentData}
+          allData={allData}
+          onAddTransaction={handleAddTransaction}
+          onAddSubCategory={handleAddSubCategory}
+          onEditSubCategory={handleEditSubCategory}
+          onDeleteSubCategory={handleDeleteSubCategory}
+        />
+      )}
 
       <OnboardingModal
         isOpen={isOnboardingOpen}
@@ -1197,77 +1586,92 @@ export default function App() {
         onSkip={handleSkipTour}
       />
 
-      <div className="fixed bottom-24 right-4 md:bottom-6 md:right-6 z-[40] flex flex-col gap-3">
-        {/* Fan Menu Options */}
-        {isFanOpen && (
-          <div className="flex flex-col gap-3 mb-2 animate-fadeIn">
-            {[
-              { id: 'income', icon: 'trending_up', label: 'Receita', color: 'bg-emerald-500' },
-              { id: 'credit_card', icon: 'credit_card', label: 'Cartão', color: 'bg-purple-500' },
-              { id: 'transfer', icon: 'sync_alt', label: 'Transf.', color: 'bg-amber-500' },
-            ].map((item, i) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  setTransactionForm({ isOpen: true, type: item.id as any });
-                  setIsFanOpen(false);
-                }}
-                className={`flex items-center gap-3 p-3 rounded-2xl text-white shadow-lg transition-all hover:scale-110 active:scale-95 ${item.color} animate-slideUp`}
-                style={{ animationDelay: `${i * 50}ms` }}
-              >
-                <span className="material-symbols-rounded text-xl">{item.icon}</span>
-                <span className="text-[10px] font-black uppercase tracking-widest pr-2">{item.label}</span>
-              </button>
-            ))}
-          </div>
-        )}
+      <RecurringDeleteModal
+        isOpen={!!deleteRequest}
+        onClose={() => setDeleteRequest(null)}
+        onConfirm={handleConfirmRecurringDelete}
+        itemName={deleteRequest?.itemName || ''}
+        itemDate={deleteRequest?.itemDate}
+        affectedMonths={deleteRequest?.affectedMonths || []}
+        currentMonthKey={currentMonthKey}
+      />
 
-        {/* Main Floating Action Button */}
-        <button
-          id="fab-add"
-          onClick={() => {
-            if (isFanOpen) {
-              setTransactionForm({ isOpen: true, type: 'expense' });
-              setIsFanOpen(false);
-            } else {
-              setIsFanOpen(true);
-            }
-          }}
-          className={`pointer-events-auto w-16 h-16 rounded-full shadow-2xl flex items-center justify-center transition-all duration-500 active:scale-90 ${
-            isFanOpen ? 'bg-rose-500 rotate-45' : 'bg-indigo-600 hover:bg-indigo-700'
-          }`}
-        >
-          <span className="material-symbols-rounded text-3xl text-white">
-            {isFanOpen ? 'close' : 'add'}
-          </span>
-        </button>
-
-        {transactionForm.isOpen && (
-          <TransactionFormScreen
-            isOpen={transactionForm.isOpen}
-            onClose={() => setTransactionForm({ isOpen: false })}
-            onSave={(data) => {
-              // Convert TransactionForm data to AddTransactionModal format
-              const mapping: any = {
-                expense: { categoryId: 'additionalVariableCosts', subCategoryId: 'mainVar', paymentMethod: 'debit' },
-                income: { categoryId: 'payslipIncome', subCategoryId: 'pedroIncome', paymentMethod: 'debit' },
-                credit_card: { categoryId: 'additionalVariableCosts', subCategoryId: 'mainVar', paymentMethod: 'credit' },
-                transfer: { categoryId: 'additionalVariableCosts', subCategoryId: 'mainVar', paymentMethod: 'debit' },
-              };
-              const config = mapping[data.type] || mapping.expense;
-              handleAddTransaction({
-                ...data,
-                ...config,
-                date: new Date(data.date),
-                installments: data.installments || 1
-              });
-              setTransactionForm({ isOpen: false });
-            }}
-            initialType={transactionForm.type as any}
-            accounts={currentData.accounts || []}
-            creditCards={currentData.cards || []}
-          />
-        )}
+      {/* No celular quem lança é o botão + da barra inferior, então o FAB fica oculto.
+          No desktop a barra inferior não existe (md:hidden) — sem o FAB não sobraria
+          nenhuma porta de entrada para o formulário de lançamento.
+          Cores e ícones vêm de ACTION_ITEMS — o mesmo menu "Nova Transação" do
+          celular — para os dois tamanhos de tela falarem a mesma língua visual.
+          Só existe UM elemento por vez neste canto: o "+" OU a caixa, nunca os
+          dois ao mesmo tempo. Como os dois são ancorados no mesmo bottom-6/
+          right-6, a caixa (mais alta) cresce ocupando exatamente o espaço que
+          o botão ocultado deixou — sem gap, sem zona morta de hover, porque
+          não há mais dois elementos disputando espaço, só uma troca de forma. */}
+      <div className="hidden md:flex fixed bottom-6 right-6 z-[40] flex-col items-end gap-3">
+        <div onMouseEnter={() => setIsFanOpen(true)} onMouseLeave={() => setIsFanOpen(false)}>
+          {isFanOpen ? (
+            <div className="w-48 rounded-2xl overflow-hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-2xl animate-slideInCol">
+              <div className="px-3.5 py-2.5 border-b border-slate-100 dark:border-white/5">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">Nova Transação</p>
+              </div>
+              <div className="py-1.5">
+                {FAB_MENU_ITEMS.map(item => (
+                  <button
+                    key={item.type}
+                    onClick={() => {
+                      setTransactionForm({ isOpen: true, type: item.type as TransactionType });
+                      setIsFanOpen(false);
+                    }}
+                    // Despesa fecha a lista com uma linha separadora — essa
+                    // última linha ocupa o canto onde o "+" ficava em repouso.
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-slate-50 dark:hover:bg-white/5 ${
+                      item.type === 'expense' ? 'border-t border-slate-100 dark:border-white/5 mt-1.5 pt-2.5' : ''
+                    }`}
+                  >
+                    {/* Mesmo tratamento "duotone" do card de "Nova Transação" no
+                        celular (fundo translúcido + borda + sombra na cor do
+                        tipo) — agora que tudo mora dentro de uma caixa opaca,
+                        dá pra copiar o estilo do mobile sem risco de contraste. */}
+                    <span
+                      className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border-2"
+                      style={{
+                        backgroundColor: item.bg,
+                        borderColor: item.border,
+                        color: item.color,
+                        boxShadow: `0 6px 14px -4px ${item.shadow}`,
+                      }}
+                    >
+                      <span className="material-symbols-rounded text-[20px] icon-filled">{item.icon}</span>
+                    </span>
+                    <span className="text-[13px] font-bold text-slate-700 dark:text-slate-200">{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            // Repouso: só o "+" (gradiente índigo→roxo, igual ao FAB central do
+            // celular). Some inteiro assim que o hover troca para a caixa acima
+            // — não fica um segundo elemento por baixo disputando o mesmo canto.
+            <button
+              id="fab-add"
+              onClick={() => {
+                setTransactionForm({ isOpen: true, type: 'expense' });
+                setIsFanOpen(false);
+              }}
+              aria-label="Nova despesa — passe o mouse para ver os outros tipos"
+              className="pointer-events-auto relative w-16 h-16 rounded-[26px] flex items-center justify-center border border-white/20 active:scale-90 transition-transform"
+              style={{
+                background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
+                boxShadow: '0 10px 30px rgba(99,102,241,0.5)',
+              }}
+            >
+              <span
+                className="absolute inset-0 rounded-[26px] animate-ping opacity-[0.18]"
+                style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)' }}
+              />
+              <span className="material-symbols-rounded relative z-10 text-[30px] text-white">add</span>
+            </button>
+          )}
+        </div>
 
         {toasts.map(toast => (
           <div key={toast.id} className="pointer-events-auto">

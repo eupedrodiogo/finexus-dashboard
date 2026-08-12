@@ -7,7 +7,8 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
   return {
     server: {
-      port: 3000,
+      // Respeita a porta atribuída pelo ambiente (permite rodar mais de um dev server)
+      port: Number(process.env.PORT) || 3000,
       host: '0.0.0.0',
     },
     plugins: [

@@ -4,11 +4,39 @@ export const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
+// `date.toISOString()` converte pra UTC antes de fatiar a data — em fusos
+// negativos (Brasil, UTC-3), isso já mostra o dia seguinte por 3 horas todo
+// fim de noite (ex.: 22h locais já é 01h UTC do dia seguinte). Usar os
+// getters locais (getFullYear/getMonth/getDate) evita esse salto de dia.
+export const toLocalISODate = (d: Date): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+export const todayISO = (): string => toLocalISODate(new Date());
+
+export const daysAgoISO = (days: number): string => {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return toLocalISODate(d);
+};
+
+// Destino das duas pernas de uma transferência entre contas. A saída fica numa
+// categoria de despesa (debita a conta de origem) e a entrada em payslipIncome
+// (credita a conta de destino).
+export const TRANSFER_SUB_NAME = 'Transferências';
+export const TRANSFER_OUT = { categoryId: 'additionalVariableCosts', subId: 'transfersOut' };
+export const TRANSFER_IN  = { categoryId: 'payslipIncome',           subId: 'transfersIn'  };
+export const TRANSFER_SUB_IDS = [TRANSFER_OUT.subId, TRANSFER_IN.subId];
+
+// Transferências movem saldo entre contas próprias — não são receita nem despesa.
+// Ficam de fora de qualquer total de resultado (mas continuam no saldo das contas).
+export const isCountableItem = (item: { isIgnored?: boolean; isTransfer?: boolean }): boolean =>
+  !item.isIgnored && !item.isTransfer;
+
 export const calculateTotal = (category: Category): number => {
   if (!category || !category.subCategories) return 0;
   return category.subCategories.reduce((subTotal, subCat) => {
     const items = subCat.items || [];
-    return subTotal + items.reduce((itemTotal, item) => itemTotal + (item.isIgnored ? 0 : (item.value || 0)), 0);
+    return subTotal + items.reduce((itemTotal, item) => itemTotal + (isCountableItem(item) ? (item.value || 0) : 0), 0);
   }, 0);
 };
 
@@ -16,7 +44,7 @@ export const calculateRealTotal = (category: Category): number => {
   if (!category || !category.subCategories) return 0;
   return category.subCategories.reduce((subTotal, subCat) => {
     const items = subCat.items || [];
-    return subTotal + items.reduce((itemTotal, item) => itemTotal + (!item.isIgnored && item.isPaid ? (item.value || 0) : 0), 0);
+    return subTotal + items.reduce((itemTotal, item) => itemTotal + (isCountableItem(item) && item.isPaid ? (item.value || 0) : 0), 0);
   }, 0);
 };
 

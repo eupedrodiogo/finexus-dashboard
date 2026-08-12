@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { processImageWithGemini, processExcelFile } from '../services/fileProcessingService';
+import { processImageWithGemini, processExcelFile, ImportDocType } from '../services/fileProcessingService';
 import { FinancialData, Account } from '../types';
 import { getOwnerLabel } from '../utils';
 
@@ -10,10 +10,17 @@ interface ImportModalProps {
     onFullRestore?: (data: { allData: any; goals?: any[] }) => void;
     initialFile?: File | null;
     accounts?: Account[];
+    defaultDocType?: ImportDocType;
 }
 
+const DOC_TYPES: { id: ImportDocType; label: string; hint: string; icon: string; accent: string }[] = [
+    { id: 'auto', label: 'Automático', hint: 'A IA detecta o tipo do documento', icon: 'auto_awesome', accent: 'indigo' },
+    { id: 'payslip', label: 'Entrada', hint: 'Contracheque / holerite / comprovante de rendimento', icon: 'arrow_upward', accent: 'emerald' },
+    { id: 'receipt', label: 'Saída', hint: 'Nota fiscal / recibo / comprovante de pagamento', icon: 'arrow_downward', accent: 'rose' },
+];
+
 export const ImportModal: React.FC<ImportModalProps> = (props) => {
-    const { isOpen, onClose, onImport, onFullRestore, initialFile, accounts } = props;
+    const { isOpen, onClose, onImport, onFullRestore, initialFile, accounts, defaultDocType = 'auto' } = props;
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [previewData, setPreviewData] = useState<any | null>(null);
@@ -21,6 +28,8 @@ export const ImportModal: React.FC<ImportModalProps> = (props) => {
     const [backupSummary, setBackupSummary] = useState<{ months: number; goals: number } | null>(null);
     const [fileName, setFileName] = useState<string>('');
     const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+    const [docType, setDocType] = useState<ImportDocType>(defaultDocType);
+    const [lastFile, setLastFile] = useState<File | null>(null);
 
     // Default to first account if available when modal opens or accounts change
     React.useEffect(() => {
@@ -30,10 +39,11 @@ export const ImportModal: React.FC<ImportModalProps> = (props) => {
         }
     }, [props.accounts]);
 
-    const processFile = async (file: File) => {
+    const processFile = async (file: File, type: ImportDocType = docType) => {
         setLoading(true);
         setError(null);
         setFileName(file.name);
+        setLastFile(file);
         setPreviewData(null);
         setIsFullBackup(false);
         setBackupSummary(null);
@@ -56,9 +66,16 @@ export const ImportModal: React.FC<ImportModalProps> = (props) => {
                     throw new Error('JSON inválido: não é um backup Finexus reconhecido (falta a chave "allData").');
                 }
             } else if (file.type === 'application/pdf' || file.type.startsWith('image/')) {
-                // AI Processing for Images/PDFs
-                data = await processImageWithGemini(file);
-                setPreviewData(data);
+                // AI Processing for Images/PDFs (contracheque = entrada, nota/recibo = saída)
+                data = await processImageWithGemini(file, type);
+                const hasItems = ['receitas', 'deducoes', 'despesas'].some(
+                    (k) => Array.isArray(data?.[k]) && data[k].length > 0
+                );
+                if (!hasItems) {
+                    setError('Nenhum lançamento foi identificado neste documento. Tente escolher o tipo (Entrada ou Saída) manualmente.');
+                } else {
+                    setPreviewData(data);
+                }
             } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
                 // Excel Processing
                 data = await processExcelFile(file);
@@ -91,6 +108,17 @@ export const ImportModal: React.FC<ImportModalProps> = (props) => {
         processFile(file);
     };
 
+    const handleDocTypeChange = (type: ImportDocType) => {
+        if (type === docType) return;
+        setDocType(type);
+
+        // Se já existe um documento carregado (não backup), reprocessa com o novo tipo
+        const isAIFile = lastFile && (lastFile.type === 'application/pdf' || lastFile.type.startsWith('image/'));
+        if (isAIFile && !loading) {
+            processFile(lastFile as File, type);
+        }
+    };
+
     const handleConfirm = () => {
         if (!previewData) return;
 
@@ -106,16 +134,22 @@ export const ImportModal: React.FC<ImportModalProps> = (props) => {
             return;
         }
 
-        // Importação AI (PDF/contracheque) — injeta accountId e repassa
+        // Importação AI (contracheque / nota / recibo) — injeta accountId e repassa
+        const enhance = (items: any[] | undefined, extra: Record<string, any> = {}) => {
+            if (!Array.isArray(items)) return items;
+            return items.map((i: any) => ({
+                ...i,
+                ...extra,
+                ...(selectedAccountId ? { accountId: selectedAccountId } : {}),
+            }));
+        };
+
         const enhancedData = { ...previewData };
-        if (selectedAccountId) {
-            if (enhancedData.receitas) {
-                enhancedData.receitas = enhancedData.receitas.map((i: any) => ({ ...i, accountId: selectedAccountId }));
-            }
-            if (enhancedData.deducoes) {
-                enhancedData.deducoes = enhancedData.deducoes.map((i: any) => ({ ...i, accountId: selectedAccountId }));
-            }
-        }
+        enhancedData.receitas = enhance(enhancedData.receitas);
+        enhancedData.deducoes = enhance(enhancedData.deducoes);
+        // Nota/recibo é comprovante de algo já pago → marca a saída como paga
+        enhancedData.despesas = enhance(enhancedData.despesas, docType === 'receipt' ? { isPaid: true } : {});
+
         onImport(enhancedData);
         onClose();
     };
@@ -142,6 +176,40 @@ export const ImportModal: React.FC<ImportModalProps> = (props) => {
 
                 {/* Body */}
                 <div className="p-6 overflow-y-auto custom-scrollbar space-y-6">
+
+                    {/* Tipo de documento */}
+                    <div className="space-y-2">
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Tipo de documento</p>
+                        <div className="grid grid-cols-3 gap-2">
+                            {DOC_TYPES.map(({ id, label, icon, accent }) => {
+                                const active = docType === id;
+                                const activeClasses: Record<string, string> = {
+                                    indigo: 'border-indigo-500 bg-indigo-500/10 text-indigo-300',
+                                    emerald: 'border-emerald-500 bg-emerald-500/10 text-emerald-300',
+                                    rose: 'border-rose-500 bg-rose-500/10 text-rose-300',
+                                };
+                                return (
+                                    <button
+                                        key={id}
+                                        type="button"
+                                        onClick={() => handleDocTypeChange(id)}
+                                        disabled={loading}
+                                        className={`flex flex-col items-center gap-1 px-2 py-3 rounded-xl border transition-all text-xs font-bold disabled:opacity-50 ${
+                                            active
+                                                ? activeClasses[accent]
+                                                : 'border-slate-700 bg-slate-800/40 text-slate-400 hover:border-slate-600 hover:text-slate-200'
+                                        }`}
+                                    >
+                                        <span className="material-symbols-rounded text-lg">{icon}</span>
+                                        {label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <p className="text-[11px] text-slate-500">
+                            {DOC_TYPES.find(d => d.id === docType)?.hint}
+                        </p>
+                    </div>
 
                     {/* File Input */}
                     <div className="border-2 border-dashed border-slate-700 rounded-xl p-8 text-center transition-all hover:border-indigo-500/50 hover:bg-slate-800/30 group cursor-pointer relative">
@@ -270,6 +338,44 @@ export const ImportModal: React.FC<ImportModalProps> = (props) => {
                                             </div>
                                         ))}
                                     </div>
+                                </div>
+                            )}
+                            {previewData.despesas && previewData.despesas.length > 0 && (
+                                <div className="space-y-3">
+                                    <h3 className="text-xs font-bold text-amber-400 uppercase tracking-widest flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                                        Saídas Identificadas
+                                    </h3>
+                                    <div className="bg-slate-950/50 rounded-xl border border-slate-800 overflow-hidden">
+                                        {previewData.despesas.map((item: any, idx: number) => (
+                                            <div key={idx} className="flex items-center justify-between p-3 border-b border-slate-800 last:border-0 hover:bg-slate-800/30 transition-colors">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="p-2 bg-amber-500/10 rounded-lg text-amber-500">
+                                                        <span className="material-symbols-rounded text-lg">receipt_long</span>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-medium text-slate-200 break-words">{item.descricao || item.estabelecimento}</p>
+                                                        <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                                            {item.categoria && (
+                                                                <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">{item.categoria}</span>
+                                                            )}
+                                                            <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">{item.pessoa || 'Geral'}</span>
+                                                            {item.data && (
+                                                                <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">{item.data}</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <span className="font-bold text-amber-400">
+                                                    - {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.valor)}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <p className="text-[11px] text-slate-500">
+                                        As saídas entram em <span className="font-semibold text-slate-400">Custos Variáveis</span>
+                                        {docType === 'receipt' ? ', já marcadas como pagas.' : '.'}
+                                    </p>
                                 </div>
                             )}
                             <div className="flex items-center justify-center gap-2 py-2">

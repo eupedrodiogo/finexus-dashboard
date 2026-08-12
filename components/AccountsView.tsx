@@ -20,7 +20,7 @@ export const AccountsView: React.FC<AccountsViewProps> = ({ data, onUpdate, isMo
     const [initialBalance, setInitialBalance] = useState('');
     const [owner, setOwner] = useState<'pedro' | 'izabel' | 'joint'>('pedro');
     const [color, setColor] = useState('#3b82f6');
-    const [type, setType] = useState<'checking' | 'savings' | 'investment' | 'cash'>('checking');
+    const [type, setType] = useState<'checking' | 'savings' | 'investment' | 'cash' | 'benefits'>('checking');
 
     const rawAccounts = data.accounts || [];
     const accounts = isPedro ? rawAccounts : rawAccounts.map((acc, idx) => ({
@@ -52,12 +52,14 @@ export const AccountsView: React.FC<AccountsViewProps> = ({ data, onUpdate, isMo
     }
 
     const handleSave = () => {
-        if (!name || !initialBalance) return;
+        if (!name.trim()) return;
+
+        const parsedBalance = initialBalance === '' ? 0 : parseFloat(initialBalance);
 
         const newAccount: Account = {
             id: editingAccount ? editingAccount.id : crypto.randomUUID(),
-            name,
-            initialBalance: parseFloat(initialBalance),
+            name: name.trim(),
+            initialBalance: isNaN(parsedBalance) ? 0 : parsedBalance,
             owner,
             color,
             type
@@ -120,7 +122,9 @@ export const AccountsView: React.FC<AccountsViewProps> = ({ data, onUpdate, isMo
                     </div>
                     <div>
                         <h3 className="font-semibold text-slate-800 dark:text-slate-100 whitespace-normal break-words">{account.name}</h3>
-                        <span className="text-xs text-slate-500 dark:text-slate-400 capitalize">{account.type}</span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400 capitalize">
+                            {{ checking: 'Corrente', savings: 'Poupança', investment: 'Investimento', cash: 'Dinheiro', benefits: 'Benefícios (VR/VA)' }[account.type as string] || account.type}
+                        </span>
                     </div>
                 </div>
 
@@ -311,6 +315,7 @@ export const AccountsView: React.FC<AccountsViewProps> = ({ data, onUpdate, isMo
                                             <option value="savings">Poupança</option>
                                             <option value="investment">Investimento</option>
                                             <option value="cash">Dinheiro</option>
+                                            <option value="benefits">Benefícios (VR/VA)</option>
                                         </select>
                                     </div>
                                 </div>

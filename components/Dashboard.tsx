@@ -4,6 +4,10 @@ import { FinancialData, Goal } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { SavingsRateIndicator } from './SavingsRateIndicator';
 import { ImportModal } from './ImportModal';
+import { SmartFinancialHealthCard } from './SmartFinancialHealthCard';
+import { SavingsCapacityCard } from './SavingsCapacityCard';
+import { SpendingEfficiencyCard } from './SpendingEfficiencyCard';
+import { calculateTotal } from '../utils';
 
 interface DashboardProps {
   data: FinancialData;
@@ -24,7 +28,14 @@ interface DashboardProps {
   goals: Goal[];
   onManageGoals?: () => void;
   onImport?: (data: any) => void;
+  onFullRestore?: (data: { allData: any; goals?: any[] }) => void;
   accountsTotal: number;
+  isDarkMode?: boolean;
+  toggleTheme?: () => void;
+  onPreviousMonth?: () => void;
+  onNextMonth?: () => void;
+  userName?: string;
+  isSyncing?: boolean;
 }
 
 const formatCurrency = (value: number) => {
@@ -59,7 +70,23 @@ const KPICard: React.FC<{
   </div>
 );
 
-export const Dashboard: React.FC<DashboardProps> = ({ data, totals, allData, goals, onManageGoals, onImport, accountsTotal }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ 
+  data, 
+  totals, 
+  allData, 
+  currentMonth,
+  goals,
+  onManageGoals,
+  onImport,
+  onFullRestore,
+  accountsTotal,
+  isDarkMode,
+  toggleTheme,
+  onPreviousMonth,
+  onNextMonth,
+  userName,
+  isSyncing
+}) => {
 
   const expenseAllocation = useMemo(() => [
     { name: 'Essenciais', value: totals.basicExpenses, color: '#6366f1' },
@@ -72,11 +99,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, totals, allData, goa
       const d = allData[key];
       const monthStr = new Date(key + '-02').toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
       
-      const income = (d.payslipIncome?.subCategories?.reduce((acc, sub) => acc + sub.items.reduce((sum, item) => sum + item.value, 0), 0) || 0) -
-        (d.payslipDeductions?.subCategories?.reduce((acc, sub) => acc + sub.items.reduce((sum, item) => sum + item.value, 0), 0) || 0);
-        
-      const expense = (d.basicExpenses?.subCategories?.reduce((acc, sub) => acc + sub.items.reduce((sum, item) => sum + item.value, 0), 0) || 0) +
-        (d.additionalVariableCosts?.subCategories?.reduce((acc, sub) => acc + sub.items.reduce((sum, item) => sum + item.value, 0), 0) || 0);
+      // calculateTotal já descarta itens ignorados e pernas de transferência,
+      // mantendo o gráfico coerente com os KPIs do mês.
+      const income = calculateTotal(d.payslipIncome) - calculateTotal(d.payslipDeductions);
+
+      const expense = calculateTotal(d.basicExpenses) + calculateTotal(d.additionalVariableCosts);
         
       return { month: monthStr, Receita: income, Despesa: expense };
     });
@@ -87,7 +114,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, totals, allData, goa
     const collect = (cat: any, label: string, color: string) => {
       cat?.subCategories?.forEach((sub: any) => {
         sub?.items?.forEach((item: any) => {
-          if (item.value > 0) items.push({ ...item, category: label, color });
+          // Transferência não é gasto — não pode aparecer no ranking de despesas.
+          if (item.value > 0 && !item.isTransfer) items.push({ ...item, category: label, color });
         });
       });
     };
@@ -98,22 +126,270 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, totals, allData, goa
 
   const [isImportModalOpen, setIsImportModalOpen] = React.useState(false);
 
-  // Helper to merge imported data - this should ideally be in App.tsx but putting here for UI integration first
-  // The actual prop `onImport` should be passed from App.tsx in a full refactor
-  // For now we will assume the parent passes a handler, or we emit an event
-
   return (
     <div className="space-y-8 animate-fadeIn">
-      {/* Actions Header */}
-      <div id="import-area" className="flex justify-end mb-4">
+      {/* 💻 Cabeçalho de Computador (Desktop Header - md e superiores) */}
+      <div className="hidden md:flex justify-between items-center gap-6 mb-8 w-full">
+        {/* Logo Area */}
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-slate-900 dark:bg-white flex items-center justify-center border border-white/10 shadow-md">
+            <span className="material-symbols-rounded text-white dark:text-slate-950 text-xl font-bold notranslate">bolt</span>
+          </div>
+          <div className="flex flex-col text-left">
+            <h1 className="text-xl font-black text-slate-800 dark:text-white leading-none tracking-tight flex items-center gap-1">
+              Finexus<span className="text-violet-500 font-extrabold">.</span>
+            </h1>
+            <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mt-0.5">
+              ESTRATÉGIA FINANCEIRA
+            </span>
+          </div>
+        </div>
+
+        {/* Right side controls */}
+        <div className="flex items-center gap-4">
+          {/* Month Selector */}
+          {onPreviousMonth && onNextMonth && (
+            <div className="flex items-center bg-white dark:bg-slate-900/40 backdrop-blur-md rounded-2xl p-1 border border-slate-200 dark:border-white/5 shadow-sm">
+              <button 
+                onClick={onPreviousMonth} 
+                className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors"
+              >
+                <span className="material-symbols-rounded text-sm notranslate leading-none">chevron_left</span>
+              </button>
+              <span className="flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-slate-800/60 rounded-xl text-xs font-black text-slate-700 dark:text-white whitespace-nowrap shadow-inner">
+                <span className="material-symbols-rounded text-xs text-indigo-500 dark:text-indigo-400 notranslate">calendar_today</span>
+                {currentMonth.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).replace(/^\w/, (c) => c.toUpperCase())}
+              </span>
+              <button 
+                onClick={onNextMonth} 
+                className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors"
+              >
+                <span className="material-symbols-rounded text-sm notranslate leading-none">chevron_right</span>
+              </button>
+            </div>
+          )}
+
+          {/* User Profile Card */}
+          <div className="flex items-center gap-3 bg-white dark:bg-slate-900/40 backdrop-blur-md rounded-2xl p-1.5 pr-4 border border-slate-200 dark:border-white/5 shadow-sm">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 overflow-hidden flex items-center justify-center border border-white/10 shadow-md">
+              <span className="text-white font-black text-sm uppercase">
+                {userName ? userName.charAt(0) : 'P'}
+              </span>
+            </div>
+            <div className="flex flex-col text-left">
+              <span className="text-xs font-black text-slate-800 dark:text-white leading-none">
+                {userName || 'Pedro Diogo'}
+              </span>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span className="text-[8px] font-black text-emerald-500 dark:text-emerald-400 uppercase tracking-widest leading-none">
+                  CLOUD ATIVA
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Theme Toggle */}
+          {toggleTheme && (
+            <button 
+              onClick={toggleTheme} 
+              className="w-10 h-10 rounded-2xl bg-white dark:bg-slate-900/40 backdrop-blur-md border border-slate-200 dark:border-white/5 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors shadow-sm"
+            >
+              <span className="material-symbols-rounded text-base notranslate">
+                {isDarkMode ? 'light_mode' : 'dark_mode'}
+              </span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 📱 Cabeçalho de Celular (Mobile Header - abaixo de md) */}
+      <div className="sticky top-0 z-30 flex md:hidden flex-col items-center justify-center w-full gap-3 -mt-4 pt-4 pb-4 -mx-4 px-4 bg-slate-50 dark:bg-slate-950 !mt-0">
+        {/* Logo Area */}
+        <div className="flex flex-col items-center justify-center w-full mb-0.5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-white flex items-center justify-center shadow-md border border-white/10">
+              <span className="material-symbols-rounded text-slate-950 text-2xl font-bold notranslate">bolt</span>
+            </div>
+            <div className="flex flex-col text-left">
+              <h1 className="text-xl font-black text-slate-800 dark:text-white leading-none tracking-tight flex items-center gap-1">
+                Finexus<span className="text-violet-500 font-extrabold">.</span>
+              </h1>
+              <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 tracking-[0.2em] mt-0.5">
+                ESTRATÉGIA FINANCEIRA
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Right side controls - Unified Pill Bar */}
+        <div className="flex items-center justify-between bg-white/80 dark:bg-[#131e35]/65 backdrop-blur-md rounded-3xl p-1 border border-slate-200/60 dark:border-white/5 w-full max-w-sm gap-2 shadow-sm">
+          {/* Month Selector */}
+          {onPreviousMonth && onNextMonth && (
+            <div className="flex items-center bg-slate-100/80 dark:bg-slate-800/80 rounded-2xl p-0.5 border border-slate-200/40 dark:border-white/5 flex-1 justify-between gap-1 max-w-[165px] shadow-inner">
+              <button 
+                onClick={onPreviousMonth} 
+                className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors"
+              >
+                <span className="material-symbols-rounded text-sm notranslate leading-none">chevron_left</span>
+              </button>
+              <span className="text-[10px] font-black text-slate-700 dark:text-white whitespace-nowrap tracking-wider px-1">
+                {currentMonth.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).replace(' de ', ' ').replace(/^\w/, (c) => c.toUpperCase())}
+              </span>
+              <button 
+                onClick={onNextMonth} 
+                className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors"
+              >
+                <span className="material-symbols-rounded text-sm notranslate leading-none">chevron_right</span>
+              </button>
+            </div>
+          )}
+
+          {/* User Profile Card */}
+          <div className="flex items-center gap-2 bg-slate-100/50 dark:bg-slate-800/40 rounded-2xl p-1 px-2.5 border border-slate-200/30 dark:border-white/5">
+            <div className="w-7 h-7 rounded-xl overflow-hidden flex items-center justify-center bg-gradient-to-tr from-indigo-500 to-purple-600 border border-white/10 relative flex-shrink-0">
+              <img 
+                src="https://lh3.googleusercontent.com/a/ACg8ocL54N0Z2g-z_-24x51XqP2r3wY3647P9r1t6g=s96-c" 
+                alt="Pedro Diogo" 
+                className="w-full h-full object-cover animate-fadeIn" 
+                onError={(e) => { e.currentTarget.style.display = 'none'; }} 
+              />
+              <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 border border-white dark:border-slate-900 animate-pulse"></span>
+            </div>
+            <div className="flex flex-col text-left">
+              <span className="text-[10px] font-black text-slate-800 dark:text-white leading-none whitespace-nowrap">
+                {userName || 'Pedro Diogo'}
+              </span>
+              <span className="text-[7px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none mt-0.5">
+                CLOUD ATIVA
+              </span>
+            </div>
+          </div>
+
+          {/* Theme Toggle */}
+          {toggleTheme && (
+            <button 
+              onClick={toggleTheme} 
+              className="w-8 h-8 rounded-full bg-slate-100/50 dark:bg-slate-800/40 border border-slate-200/30 dark:border-white/5 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors"
+            >
+              <span className="material-symbols-rounded text-sm notranslate leading-none">
+                {isDarkMode ? 'light_mode' : 'dark_mode'}
+              </span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 💻 Ações de Computador (Desktop Actions - md e superiores) */}
+      <div className="hidden md:flex justify-between items-center mb-6">
+        <button
+          onClick={onManageGoals}
+          className="flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-slate-900/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700/50 rounded-2xl shadow-sm transition-all font-black text-xs uppercase tracking-wider"
+        >
+          <span className="material-symbols-rounded text-base notranslate">tune</span>
+          Personalizar Dashboard
+        </button>
+
         <button
           onClick={() => setIsImportModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-lg shadow-indigo-500/20 transition-all font-bold text-sm"
+          className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-2xl shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/35 transition-all font-black text-xs uppercase tracking-wider"
         >
-          <span className="material-symbols-rounded">upload_file</span>
-          Importar
+          <span className="material-symbols-rounded text-base notranslate">upload_file</span>
+          Importar Extrato
         </button>
       </div>
+
+      {/* 📱 Ações de Celular (Mobile Actions - abaixo de md) */}
+      <div className="flex md:hidden flex-col gap-3 mb-6 w-full">
+        <button
+          onClick={onManageGoals}
+          className="w-full flex items-center justify-center gap-2 py-3 bg-[#131e35]/65 dark:bg-slate-900/60 hover:bg-slate-800/60 text-slate-300 dark:text-slate-200 border border-white/5 rounded-2xl transition-all font-black text-xs uppercase tracking-wider shadow-md"
+        >
+          <span className="material-symbols-rounded text-base notranslate">tune</span>
+          Personalizar Dashboard
+        </button>
+
+        <button
+          onClick={() => setIsImportModalOpen(true)}
+          className="w-full flex items-center justify-center gap-2 py-3.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-2xl shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/35 transition-all font-black text-xs uppercase tracking-wider"
+        >
+          <span className="material-symbols-rounded text-base notranslate">upload_file</span>
+          Importar Extrato
+        </button>
+      </div>
+
+      {/* Smart Health Card ocupando 100% da largura */}
+      <div className="w-full mb-6">
+        <SmartFinancialHealthCard 
+          netIncome={totals.netIncome} 
+          totalOut={totals.totalExpenses} 
+          investments={totals.investments}
+          previousBalance={totals.previousBalance}
+          balance={totals.balance}
+        />
+      </div>
+
+      {/* Reserva do João Vitor Horizontal Card - 100% width */}
+      {data.joaoVitorReserve !== undefined && data.joaoVitorTarget !== undefined && (
+        <div className="w-full mb-6 glass-card rounded-[2.5rem] p-6 sm:p-8 border border-slate-200 dark:border-white/5 bg-white dark:bg-slate-900/40 backdrop-blur-md relative overflow-hidden group hover:scale-[1.01] transition-all duration-500 shadow-xl">
+          {/* Decorative background glow */}
+          <div className="absolute right-0 bottom-0 w-80 h-80 bg-emerald-500/[0.02] blur-3xl rounded-full pointer-events-none" />
+
+          {/* Top Section */}
+          <div className="flex justify-between items-start mb-6">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 border border-emerald-500/25 shadow-md shadow-emerald-500/5">
+                <span className="material-symbols-rounded text-3xl notranslate">child_care</span>
+              </div>
+              <div>
+                <h3 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white tracking-tight">
+                  Reserva do João Vitor
+                </h3>
+                <p className="text-xs sm:text-sm font-bold text-slate-400 dark:text-slate-500 mt-0.5">
+                  Construindo o ninho...
+                </p>
+              </div>
+            </div>
+            
+            <div className="text-right">
+              <span className="text-3xl sm:text-4xl font-black text-emerald-500 block leading-none">
+                {((data.joaoVitorReserve / data.joaoVitorTarget) * 100).toFixed(0)}%
+              </span>
+              <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mt-1">
+                PROGRESSO
+              </span>
+            </div>
+          </div>
+
+          {/* Main Progress Bar */}
+          <div className="h-3 w-full bg-slate-100 dark:bg-slate-800/80 rounded-full overflow-hidden mb-6 relative border border-slate-200/5">
+            <div
+              className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-1000"
+              style={{ width: `${Math.min((data.joaoVitorReserve / data.joaoVitorTarget) * 100, 100)}%` }}
+            />
+          </div>
+
+          {/* Bottom Metas Section */}
+          <div className="flex justify-between items-end">
+            <div>
+              <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-0.5">
+                ACUMULADO
+              </span>
+              <h4 className="text-lg sm:text-2xl font-black text-slate-700 dark:text-white leading-none">
+                {formatCurrency(data.joaoVitorReserve)}
+              </h4>
+            </div>
+            <div className="text-right">
+              <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-0.5">
+                META FINAL
+              </span>
+              <h4 className="text-lg sm:text-2xl font-black text-slate-700 dark:text-white leading-none">
+                {formatCurrency(data.joaoVitorTarget)}
+              </h4>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Top Level Summary */}
       <div id="kpi-summary" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -229,6 +505,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, totals, allData, goa
             Metas Financeiras
           </h3>
           <div className="flex-1 space-y-6">
+
             {goals.length === 0 ? (
               <div className="text-center py-6 text-slate-400">
                 <p className="text-sm">Nenhuma meta definida.</p>
@@ -313,6 +590,41 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, totals, allData, goa
         </div>
       </div>
 
+      {/* Financial Intelligence & Optimization */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-1">
+          <SavingsCapacityCard grossIncome={totals.netIncome + totals.totalExpenses} totalOut={totals.totalExpenses} />
+        </div>
+        <div className="lg:col-span-1">
+          <SpendingEfficiencyCard efficiency={Math.max(0, Math.min(100, Math.round(100 - (totals.totalExpenses / (totals.netIncome > 0 ? totals.netIncome : 1) * 100))))} />
+        </div>
+        <div className="lg:col-span-1 glass-card rounded-[2.5rem] p-8 bg-gradient-to-br from-indigo-900/5 to-indigo-900/10 dark:from-white/5 dark:to-white/10 border border-white/20 flex flex-col justify-between">
+          <div>
+            <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2 mb-2">
+              <span className="w-1.5 h-6 bg-indigo-500 rounded-full"></span>
+              Alocação Recomendada
+            </h3>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-6">Divisão do Orçamento</p>
+          </div>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center text-xs font-bold">
+              <span className="text-slate-500">Essenciais (50% Alvo)</span>
+              <span className="text-slate-800 dark:text-white">{(totals.netIncome > 0 ? (totals.basicExpenses / totals.netIncome * 100).toFixed(0) : 0)}%</span>
+            </div>
+            <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+              <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${Math.min(100, (totals.netIncome > 0 ? (totals.basicExpenses / totals.netIncome * 100) : 0))}%` }} />
+            </div>
+            <div className="flex justify-between items-center text-xs font-bold">
+              <span className="text-slate-500">Investimentos (30% Alvo)</span>
+              <span className="text-slate-800 dark:text-white">{(totals.netIncome > 0 ? (totals.investments / totals.netIncome * 100).toFixed(0) : 0)}%</span>
+            </div>
+            <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+              <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.min(100, (totals.netIncome > 0 ? (totals.investments / totals.netIncome * 100) : 0))}%` }} />
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Import Modal */}
       {isImportModalOpen && (
         <React.Suspense fallback={null}>
@@ -321,6 +633,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, totals, allData, goa
             onClose={() => setIsImportModalOpen(false)}
             onImport={(data) => {
               if (onImport) onImport(data);
+              setIsImportModalOpen(false);
+            }}
+            onFullRestore={(data) => {
+              if (onFullRestore) onFullRestore(data);
               setIsImportModalOpen(false);
             }}
             accounts={data.accounts}

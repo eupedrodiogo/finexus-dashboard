@@ -117,7 +117,7 @@ export const RecurringDeleteModal: React.FC<RecurringDeleteModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm animate-fadeIn"
+      className="fixed inset-0 z-[50000] flex items-end md:items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm animate-fadeIn"
       onClick={handleClose}
     >
       <div

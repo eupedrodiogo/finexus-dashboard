@@ -20,20 +20,24 @@ import {
   ChevronUp,
   Calendar,
   CreditCard,
-  EyeOff
+  EyeOff,
+  Eye,
+  Percent,
+  AlertTriangle,
+  Ban
 } from 'lucide-react';
 import { Category, Account } from '../types';
 import { EditableRow } from './EditableRow';
 import { Modal } from './Modal';
 import { ItemManagementOverlay } from './ItemManagementOverlay';
-import { getAnonymizedLabel } from '../utils';
+import { getAnonymizedLabel, isCountableItem } from '../utils';
 
 interface CategorySectionProps {
     category: Category;
     total: number;
     onItemChange: (subId: string, itemId: string, val: number) => void;
     onItemNameChange: (subId: string, itemId: string, val: string) => void;
-    onItemAdd: (subId: string) => void;
+    onItemAdd: (subId: string, newItemId: string) => void;
     onItemDelete: (subId: string, itemId: string) => void;
     onTitleChange: (val: string) => void;
     onBudgetChange: (val: number) => void;
@@ -84,7 +88,15 @@ export const CategorySection: React.FC<CategorySectionProps> = ({
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [editingSubId, setEditingSubId] = useState<string | null>(null);
     const [collapsedSubs, setCollapsedSubs] = useState<Record<string, boolean>>({});
-    const [bulkModalData, setBulkModalData] = useState<{ subId: string, count: number } | null>(null);
+    const [bulkModalSubId, setBulkModalSubId] = useState<string | null>(null);
+    const [bulkConfirmDelete, setBulkConfirmDelete] = useState(false);
+    const [bulkCustomPercent, setBulkCustomPercent] = useState('');
+
+    const closeBulkModal = () => {
+        setBulkModalSubId(null);
+        setBulkConfirmDelete(false);
+        setBulkCustomPercent('');
+    };
 
     const toggleSubCollapse = (subId: string) => {
         setCollapsedSubs(prev => ({ ...prev, [subId]: !prev[subId] }));
@@ -92,7 +104,7 @@ export const CategorySection: React.FC<CategorySectionProps> = ({
     
     // Cálculo de Realizado vs Planejado
     const allItems = category.subCategories.flatMap(sub => sub.items);
-    const realTotal = allItems.filter(i => i.isPaid && !i.isIgnored).reduce((acc, i) => acc + i.value, 0);
+    const realTotal = allItems.filter(i => i.isPaid && isCountableItem(i)).reduce((acc, i) => acc + i.value, 0);
     const remainingToPay = total - realTotal;
     const paymentProgress = total > 0 ? (realTotal / total) * 100 : 0;
 
@@ -156,9 +168,14 @@ export const CategorySection: React.FC<CategorySectionProps> = ({
         });
     };
 
+    // Ids selecionados que ainda existem na lista — a seleção pode conter itens já
+    // removidos (exclusão em massa, sync de outro dispositivo).
+    const getLiveSelection = (subId: string, items: any[]) =>
+        (selectedItems[subId] || []).filter(id => items.some(i => i.id === id));
+
     const toggleSelectAll = (subId: string, items: any[]) => {
         setSelectedItems(prev => {
-            const current = prev[subId] || [];
+            const current = (prev[subId] || []).filter(id => items.some(i => i.id === id));
             if (current.length === items.length && items.length > 0) {
                 return { ...prev, [subId]: [] };
             } else {
@@ -167,14 +184,18 @@ export const CategorySection: React.FC<CategorySectionProps> = ({
         });
     };
 
+    const clearSelection = (subId: string) => {
+        setSelectedItems(prev => ({ ...prev, [subId]: [] }));
+    };
+
     const handleDeleteSelected = (subId: string) => {
         const ids = selectedItems[subId] || [];
         if (ids.length === 0) return;
 
-        if (window.confirm(`Excluir ${ids.length} itens selecionados?`)) {
-            onBulkItemDelete && onBulkItemDelete(subId, ids);
-            setSelectedItems(prev => ({ ...prev, [subId]: [] }));
-        }
+        // Não limpa a seleção aqui: a exclusão pode abrir o diálogo de recorrência e
+        // o usuário ainda pode cancelar. Ids removidos são descartados por getLiveSelection.
+        onBulkItemDelete && onBulkItemDelete(subId, ids);
+        closeBulkModal();
     };
 
     const handleIgnoreSelected = (subId: string) => {
@@ -182,34 +203,48 @@ export const CategorySection: React.FC<CategorySectionProps> = ({
         if (ids.length === 0) return;
 
         onBulkItemIgnore && onBulkItemIgnore(subId, ids);
-        setSelectedItems(prev => ({ ...prev, [subId]: [] }));
+        clearSelection(subId);
+        closeBulkModal();
     };
 
     const handleUpdateSelectedAccount = (subId: string, accountId: string) => {
         const ids = selectedItems[subId] || [];
-        if (ids.length === 0) return;
-        if (onBulkItemUpdate) onBulkItemUpdate(subId, ids, { accountId });
-        setSelectedItems(prev => ({ ...prev, [subId]: [] }));
+        if (ids.length === 0 || !onBulkItemUpdate) return;
+
+        onBulkItemUpdate(subId, ids, { accountId });
+        clearSelection(subId);
+        closeBulkModal();
     };
 
     const handleTogglePaidSelected = (subId: string, isPaid: boolean) => {
         const ids = selectedItems[subId] || [];
-        if (ids.length === 0) return;
-        if (onBulkItemUpdate) onBulkItemUpdate(subId, ids, { isPaid });
-        setSelectedItems(prev => ({ ...prev, [subId]: [] }));
+        if (ids.length === 0 || !onBulkItemUpdate) return;
+
+        onBulkItemUpdate(subId, ids, { isPaid });
+        clearSelection(subId);
+        closeBulkModal();
+    };
+
+    const handleToggleRecurringSelected = (subId: string, isRecurring: boolean) => {
+        const ids = selectedItems[subId] || [];
+        if (ids.length === 0 || !onBulkItemUpdate) return;
+
+        onBulkItemUpdate(subId, ids, { isRecurring });
+        clearSelection(subId);
+        closeBulkModal();
     };
 
     const handleAdjustSelectedValues = (subId: string, percent: number) => {
         const ids = selectedItems[subId] || [];
-        if (ids.length === 0) return;
+        if (ids.length === 0 || !onBulkItemUpdate || !percent) return;
 
-        if (onBulkItemUpdate) {
-            onBulkItemUpdate(subId, ids, (item: any) => ({
-                value: item.value * (1 + (percent / 100))
-            }));
-        }
-        
-        setSelectedItems(prev => ({ ...prev, [subId]: [] }));
+        // Updater por item: cada valor é recalculado a partir do próprio valor atual.
+        onBulkItemUpdate(subId, ids, (item: any) => ({
+            value: Math.round((item.value || 0) * (1 + (percent / 100)) * 100) / 100
+        }));
+
+        clearSelection(subId);
+        closeBulkModal();
     };
 
     const getHeaderColor = (bgClass: string) => {
@@ -238,6 +273,24 @@ export const CategorySection: React.FC<CategorySectionProps> = ({
     let progressColor = 'bg-emerald-500';
     if (progressPercentage > 100) progressColor = 'bg-rose-500';
     else if (progressPercentage > 85) progressColor = 'bg-amber-500';
+
+    // --- Estado derivado do modal de Ações em Massa ---
+    // Lido ao vivo dos itens reais para que o modal reflita a seleção atual
+    // (contagem, total e o estado agregado de pago/ignorado/recorrente).
+    const bulkSub = bulkModalSubId ? category.subCategories.find(s => s.id === bulkModalSubId) : undefined;
+    const bulkSelectedIds = bulkModalSubId ? (selectedItems[bulkModalSubId] || []) : [];
+    const bulkItems = bulkSub ? bulkSub.items.filter(i => bulkSelectedIds.includes(i.id)) : [];
+    const bulkCount = bulkItems.length;
+    const bulkTotal = bulkItems.reduce((acc, i) => acc + (i.value || 0), 0);
+    const bulkAllPaid = bulkCount > 0 && bulkItems.every(i => i.isPaid);
+    const bulkAllIgnored = bulkCount > 0 && bulkItems.every(i => i.isIgnored);
+    const bulkAllRecurring = bulkCount > 0 && bulkItems.every(i => i.isRecurring);
+    const bulkSharedAccountId = bulkCount > 0 && bulkItems.every(i => (i.accountId || '') === (bulkItems[0].accountId || ''))
+        ? (bulkItems[0].accountId || '')
+        : null;
+    const isIncomeCategory = category.id.includes('Income');
+    const parsedCustomPercent = parseFloat(bulkCustomPercent.replace(',', '.'));
+    const hasValidCustomPercent = !isNaN(parsedCustomPercent) && parsedCustomPercent !== 0;
 
     return (
         <div className="bg-white dark:bg-slate-900/70 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm p-4 sm:p-6 transition-all duration-300 w-full mb-6 relative">
@@ -362,7 +415,11 @@ export const CategorySection: React.FC<CategorySectionProps> = ({
                 {category.subCategories.map(sub => {
                     if (sub.name === 'Importados' && (!sub.items || sub.items.length === 0)) return null;
 
-                    const subTotal = sub.items.reduce((acc, item) => acc + item.value, 0);
+                    // Pernas de transferência aparecem na lista mas não somam no subtotal
+                    // (elas movem saldo entre contas, não são receita nem despesa).
+                    const subTotal = sub.items.reduce((acc, item) => acc + (item.isTransfer ? 0 : item.value), 0);
+                    const liveSelection = getLiveSelection(sub.id, sub.items);
+                    const allSelected = liveSelection.length === sub.items.length && sub.items.length > 0;
 
                     return (
                         <div key={sub.id} className="group/subcategory bg-slate-50/50 dark:bg-slate-900/40 rounded-2xl border border-slate-100 dark:border-slate-800/60 overflow-hidden">
@@ -385,11 +442,11 @@ export const CategorySection: React.FC<CategorySectionProps> = ({
                                             title="Selecionar todos"
                                         >
                                             <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors ${
-                                                (selectedItems[sub.id]?.length === sub.items.length && sub.items.length > 0)
-                                                    ? 'bg-indigo-500 border-indigo-500' 
+                                                allSelected
+                                                    ? 'bg-indigo-500 border-indigo-500'
                                                     : 'border-slate-300 dark:border-slate-600 hover:border-indigo-400'
                                             }`}>
-                                                {(selectedItems[sub.id]?.length === sub.items.length && sub.items.length > 0) && (
+                                                {allSelected && (
                                                     <div className="w-1.5 h-1.5 bg-white rounded-full" />
                                                 )}
                                             </div>
@@ -439,16 +496,18 @@ export const CategorySection: React.FC<CategorySectionProps> = ({
                                     </div>
                                     
                                         <div className="flex flex-1 items-center justify-end gap-2 sm:gap-3 min-w-0">
-                                            {(selectedItems[sub.id]?.length || 0) > 0 && (
+                                            {liveSelection.length > 0 && (
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        setBulkModalData({ subId: sub.id, count: selectedItems[sub.id].length });
+                                                        setBulkConfirmDelete(false);
+                                                        setBulkCustomPercent('');
+                                                        setBulkModalSubId(sub.id);
                                                     }}
                                                     className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-600 text-white font-black text-[10px] uppercase tracking-wider hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20 border border-indigo-500/50 animate-bounce-subtle"
                                                 >
                                                     <Zap size={12} fill="currentColor" />
-                                                    Ações ({selectedItems[sub.id].length})
+                                                    Ações ({liveSelection.length})
                                                 </button>
                                             )}
                                             <span className={`flex-shrink-0 text-[11px] font-black ${headerColorClass} bg-white dark:bg-slate-900 px-2 py-0.5 rounded-md shadow-sm border border-transparent dark:border-slate-700/50`}>
@@ -486,7 +545,19 @@ export const CategorySection: React.FC<CategorySectionProps> = ({
 
                                     {/* Botão Novo Item */}
                                     <button
-                                        onClick={() => onItemAdd(sub.id)}
+                                        onClick={() => {
+                                            const newItemId = `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                                            onItemAdd(sub.id, newItemId);
+                                            openEditModal(sub.id, {
+                                                id: newItemId,
+                                                name: 'Novo Item',
+                                                value: 0,
+                                                isPaid: false,
+                                                isRecurring: false,
+                                                isIgnored: false,
+                                                accountId: ''
+                                            });
+                                        }}
                                         className="w-full mt-1.5 py-2.5 px-3 flex items-center justify-center gap-2 text-[10px] font-black text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 rounded-xl transition-all group/add uppercase tracking-widest border border-transparent border-dashed hover:border-slate-200 dark:hover:border-slate-700/50"
                                     >
                                         <Plus size={12} strokeWidth={3} className="group-hover/add:scale-125 transition-transform text-slate-300 group-hover/add:text-indigo-500" />
@@ -734,65 +805,68 @@ export const CategorySection: React.FC<CategorySectionProps> = ({
             )}
 
             {/* Modal de Ações em Massa Premium */}
-            <Modal isOpen={!!bulkModalData} onClose={() => setBulkModalData(null)}>
-                <div className="relative w-[95vw] max-w-md bg-white dark:bg-slate-900 rounded-[32px] shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 animate-slideUp">
+            <Modal isOpen={!!bulkModalSubId && bulkCount > 0} onClose={closeBulkModal}>
+                <div className="relative w-[95vw] max-w-md bg-white dark:bg-slate-900 rounded-[32px] shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 flex flex-col max-h-[92vh]">
                     {/* Header do Modal */}
-                    <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2.5 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-500/20">
+                    <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50 flex-shrink-0">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <div className="p-2.5 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-500/20 flex-shrink-0">
                                 <Zap size={18} className="text-white" fill="currentColor" />
                             </div>
-                            <div>
+                            <div className="min-w-0">
                                 <h3 className="text-base font-black text-slate-800 dark:text-white leading-none">Ações em Massa</h3>
-                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
-                                    {bulkModalData?.count} itens selecionados
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1 truncate">
+                                    {bulkCount} {bulkCount === 1 ? 'item' : 'itens'} · <span className="text-indigo-500">{formatCurrency(bulkTotal)}</span>
                                 </p>
                             </div>
                         </div>
-                        <button 
-                            onClick={() => setBulkModalData(null)}
-                            className="w-8 h-8 flex items-center justify-center rounded-full bg-white dark:bg-slate-700 text-slate-400 hover:text-indigo-500 transition-all border border-slate-100 dark:border-slate-600"
+                        <button
+                            onClick={closeBulkModal}
+                            className="w-8 h-8 flex items-center justify-center rounded-full bg-white dark:bg-slate-700 text-slate-400 hover:text-indigo-500 transition-all border border-slate-100 dark:border-slate-600 flex-shrink-0"
                         >
                             <X size={16} />
                         </button>
                     </div>
 
                     {/* Conteúdo do Modal */}
-                    <div className="p-6 space-y-6">
-                        {/* Ação Principal: Pago/Recebido */}
+                    <div className="p-6 space-y-6 overflow-y-auto no-scrollbar">
+                        {/* Ação Principal: Pago/Recebido (alterna conforme o estado da seleção) */}
                         <button
-                            onClick={() => {
-                                if (bulkModalData) handleTogglePaidSelected(bulkModalData.subId, true);
-                                setBulkModalData(null);
-                            }}
-                            className="w-full flex items-center justify-center gap-3 p-4 rounded-2xl bg-emerald-500 text-white font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 transition-all active:scale-[0.98]"
+                            onClick={() => bulkModalSubId && handleTogglePaidSelected(bulkModalSubId, !bulkAllPaid)}
+                            className={`w-full flex items-center justify-center gap-3 p-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg transition-all active:scale-[0.98] ${
+                                bulkAllPaid
+                                    ? 'bg-slate-700 dark:bg-slate-700 text-white shadow-slate-500/20 hover:bg-slate-800'
+                                    : 'bg-emerald-500 text-white shadow-emerald-500/20 hover:bg-emerald-600'
+                            }`}
                         >
-                            <CheckCircle2 size={20} />
-                            {category.id.includes('Income') ? 'Marcar como Recebido' : 'Marcar como Pago'}
+                            {bulkAllPaid ? <Circle size={20} /> : <CheckCircle2 size={20} />}
+                            {bulkAllPaid
+                                ? (isIncomeCategory ? 'Desmarcar Recebimento' : 'Desmarcar Pagamento')
+                                : (isIncomeCategory ? 'Marcar como Recebido' : 'Marcar como Pago')}
                         </button>
 
-                        {/* Status e Exclusão */}
+                        {/* Status: Ignorar e Recorrência */}
                         <div className="grid grid-cols-2 gap-3">
                             <button
-                                onClick={() => {
-                                    if (bulkModalData) handleIgnoreSelected(bulkModalData.subId);
-                                    setBulkModalData(null);
-                                }}
-                                className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/50 hover:bg-amber-100 transition-all group"
+                                onClick={() => bulkModalSubId && handleIgnoreSelected(bulkModalSubId)}
+                                className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/50 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-all group"
                             >
-                                <EyeOff size={20} className="text-amber-600 dark:text-amber-400 group-hover:scale-110 transition-transform" />
-                                <span className="text-[10px] font-black uppercase text-amber-700 dark:text-amber-300 tracking-widest">Alternar Ignorar</span>
+                                {bulkAllIgnored
+                                    ? <Eye size={20} className="text-amber-600 dark:text-amber-400 group-hover:scale-110 transition-transform" />
+                                    : <EyeOff size={20} className="text-amber-600 dark:text-amber-400 group-hover:scale-110 transition-transform" />}
+                                <span className="text-[10px] font-black uppercase text-amber-700 dark:text-amber-300 tracking-widest text-center leading-tight">
+                                    {bulkAllIgnored ? 'Voltar a Contar' : 'Ignorar nos Cálculos'}
+                                </span>
                             </button>
 
                             <button
-                                onClick={() => {
-                                    if (bulkModalData) handleDeleteSelected(bulkModalData.subId);
-                                    setBulkModalData(null);
-                                }}
-                                className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-800/50 hover:bg-rose-100 transition-all group"
+                                onClick={() => bulkModalSubId && handleToggleRecurringSelected(bulkModalSubId, !bulkAllRecurring)}
+                                className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-all group"
                             >
-                                <Trash2 size={20} className="text-rose-600 dark:text-rose-400 group-hover:scale-110 transition-transform" />
-                                <span className="text-[10px] font-black uppercase text-rose-700 dark:text-rose-300 tracking-widest">Excluir Tudo</span>
+                                <Repeat size={20} className="text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform" />
+                                <span className="text-[10px] font-black uppercase text-indigo-700 dark:text-indigo-300 tracking-widest text-center leading-tight">
+                                    {bulkAllRecurring ? 'Tornar Pontual' : 'Tornar Recorrente'}
+                                </span>
                             </button>
                         </div>
 
@@ -802,40 +876,58 @@ export const CategorySection: React.FC<CategorySectionProps> = ({
                                 <CreditCard size={12} />
                                 Mover para Conta
                             </label>
-                            <div className="grid grid-cols-2 gap-2">
-                                {accounts.map(acc => (
+                            {accounts.length === 0 ? (
+                                <p className="text-[10px] font-bold text-slate-400 px-1">
+                                    Nenhuma conta cadastrada. Crie contas em "Contas" para usar esta ação.
+                                </p>
+                            ) : (
+                                <div className="grid grid-cols-2 gap-2">
+                                    {accounts.map(acc => {
+                                        const isCurrent = bulkSharedAccountId === acc.id;
+                                        return (
+                                            <button
+                                                key={acc.id}
+                                                onClick={() => bulkModalSubId && handleUpdateSelectedAccount(bulkModalSubId, acc.id)}
+                                                className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all text-left ${
+                                                    isCurrent
+                                                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 ring-2 ring-indigo-500/10'
+                                                        : 'border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 hover:border-indigo-500/50'
+                                                }`}
+                                            >
+                                                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: acc.color }} />
+                                                <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300 truncate">{acc.name}</span>
+                                            </button>
+                                        );
+                                    })}
                                     <button
-                                        key={acc.id}
-                                        onClick={() => {
-                                            if (bulkModalData) handleUpdateSelectedAccount(bulkModalData.subId, acc.id);
-                                            setBulkModalData(null);
-                                        }}
-                                        className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 hover:border-indigo-500/50 transition-all text-left"
+                                        onClick={() => bulkModalSubId && handleUpdateSelectedAccount(bulkModalSubId, '')}
+                                        className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all text-left ${
+                                            bulkSharedAccountId === ''
+                                                ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 ring-2 ring-indigo-500/10'
+                                                : 'border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 hover:border-indigo-500/50'
+                                        }`}
                                     >
-                                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: acc.color }} />
-                                        <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300 truncate">{acc.name}</span>
+                                        <Ban size={10} className="text-slate-400 flex-shrink-0" />
+                                        <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 truncate">Sem conta</span>
                                     </button>
-                                ))}
-                            </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Reajuste de Valor */}
                         <div className="space-y-3">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 px-1">
-                                <Plus size={12} />
+                                <Percent size={12} />
                                 Reajuste Rápido
                             </label>
                             <div className="grid grid-cols-4 gap-2">
                                 {[5, 10, -5, -10].map(val => (
                                     <button
                                         key={val}
-                                        onClick={() => {
-                                            if (bulkModalData) handleAdjustSelectedValues(bulkModalData.subId, val);
-                                            setBulkModalData(null);
-                                        }}
+                                        onClick={() => bulkModalSubId && handleAdjustSelectedValues(bulkModalSubId, val)}
                                         className={`p-3 rounded-xl font-black text-xs transition-all border ${
-                                            val > 0 
-                                                ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-800/50 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100' 
+                                            val > 0
+                                                ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-800/50 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100'
                                                 : 'bg-rose-50 dark:bg-rose-900/20 border-rose-100 dark:border-rose-800/50 text-rose-600 dark:text-rose-400 hover:bg-rose-100'
                                         }`}
                                     >
@@ -843,13 +935,81 @@ export const CategorySection: React.FC<CategorySectionProps> = ({
                                     </button>
                                 ))}
                             </div>
+
+                            {/* Percentual personalizado */}
+                            <div className="flex items-center gap-2">
+                                <div className="relative flex-1">
+                                    <input
+                                        type="number"
+                                        step="0.1"
+                                        value={bulkCustomPercent}
+                                        onChange={e => setBulkCustomPercent(e.target.value)}
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter' && hasValidCustomPercent && bulkModalSubId) {
+                                                handleAdjustSelectedValues(bulkModalSubId, parsedCustomPercent);
+                                            }
+                                        }}
+                                        placeholder="Outro %"
+                                        className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl pl-3 pr-8 py-2.5 text-xs font-black text-slate-700 dark:text-white focus:outline-none focus:border-indigo-500/60 focus:ring-4 focus:ring-indigo-500/10 transition-all"
+                                    />
+                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">%</span>
+                                </div>
+                                <button
+                                    disabled={!hasValidCustomPercent}
+                                    onClick={() => bulkModalSubId && handleAdjustSelectedValues(bulkModalSubId, parsedCustomPercent)}
+                                    className="px-4 py-2.5 rounded-xl bg-indigo-600 text-white font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:active:scale-100"
+                                >
+                                    Aplicar
+                                </button>
+                            </div>
+                            {hasValidCustomPercent && (
+                                <p className="text-[10px] font-bold text-slate-400 px-1">
+                                    Novo total: <span className="text-indigo-500">{formatCurrency(bulkTotal * (1 + parsedCustomPercent / 100))}</span>
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Zona de Perigo: exclusão com confirmação em dois passos */}
+                        <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                            {!bulkConfirmDelete ? (
+                                <button
+                                    onClick={() => setBulkConfirmDelete(true)}
+                                    className="w-full flex items-center justify-center gap-2 p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-800/50 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-all font-black text-[10px] uppercase tracking-widest"
+                                >
+                                    <Trash2 size={16} />
+                                    Excluir {bulkCount} {bulkCount === 1 ? 'item' : 'itens'}
+                                </button>
+                            ) : (
+                                <div className="rounded-2xl bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/50 p-4 space-y-3 animate-fadeIn">
+                                    <div className="flex items-start gap-2">
+                                        <AlertTriangle size={16} className="text-rose-500 flex-shrink-0 mt-0.5" />
+                                        <p className="text-[11px] font-bold text-rose-700 dark:text-rose-300 leading-snug">
+                                            Excluir {bulkCount} {bulkCount === 1 ? 'item' : 'itens'} ({formatCurrency(bulkTotal)}) deste mês? Esta ação não pode ser desfeita.
+                                        </p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button
+                                            onClick={() => setBulkConfirmDelete(false)}
+                                            className="py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-500 font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all"
+                                        >
+                                            Voltar
+                                        </button>
+                                        <button
+                                            onClick={() => bulkModalSubId && handleDeleteSelected(bulkModalSubId)}
+                                            className="py-2.5 rounded-xl bg-rose-600 text-white font-black text-[10px] uppercase tracking-widest hover:bg-rose-700 transition-all active:scale-95"
+                                        >
+                                            Confirmar
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 
                     {/* Footer */}
-                    <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800">
-                        <button 
-                            onClick={() => setBulkModalData(null)}
+                    <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 flex-shrink-0">
+                        <button
+                            onClick={closeBulkModal}
                             className="w-full py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all"
                         >
                             Cancelar Operação

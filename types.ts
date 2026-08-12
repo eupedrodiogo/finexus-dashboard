@@ -3,8 +3,10 @@
  * Padrão unificado de recorrência:
  *   isRecurring      — flag principal. Se true, o item é propagado para meses futuros.
  *   frequency        — cadência da recorrência. Atualmente apenas 'monthly' é suportado.
- *   recurrenceLimit  — número de meses que deve durar (contando a partir de `date`).
- *                      undefined/null = infinito.
+ *   recurrenceLimit  — número de meses que deve durar (contando a partir de
+ *                      `recurrenceStart`). undefined/null = infinito.
+ *   recurrenceStart  — data do lançamento original. Preservada nas cópias
+ *                      propagadas para o limite não reiniciar a cada mês.
  */
 export interface LineItem {
   id: string;
@@ -13,6 +15,7 @@ export interface LineItem {
   isRecurring?: boolean;
   frequency?: 'monthly'; // Cadência da recorrência (padrão: monthly)
   recurrenceLimit?: number; // Nº de meses a propagar (undefined = infinito)
+  recurrenceStart?: string; // ISO Date do lançamento original — âncora do limite
   annualRate?: number;
   // Credit Card Fields
   paymentMethod?: 'credit' | 'debit' | 'pix' | 'cash';
@@ -26,6 +29,15 @@ export interface LineItem {
   accountId?: string;
   isPaid?: boolean;
   isIgnored?: boolean;
+  /**
+   * Transferência entre contas. Uma transferência gera DUAS pernas com o mesmo
+   * `transferId`: a saída (categoria de despesa, conta de origem) e a entrada
+   * (payslipIncome, conta de destino). Pernas de transferência movem o saldo das
+   * contas mas NÃO entram em receita/despesa do mês — por isso ficam de fora de
+   * calculateTotal/calculateRealTotal.
+   */
+  isTransfer?: boolean;
+  transferId?: string;
 }
 
 export interface SubCategory {
@@ -81,7 +93,7 @@ export interface CreditCard {
 export interface Account {
   id: string;
   name: string;
-  type: 'checking' | 'savings' | 'investment' | 'cash';
+  type: 'checking' | 'savings' | 'investment' | 'cash' | 'benefits';
   owner: 'pedro' | 'izabel' | 'joint';
   initialBalance: number;
   color: string;
