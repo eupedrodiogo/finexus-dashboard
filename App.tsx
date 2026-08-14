@@ -123,7 +123,7 @@ export default function App() {
   const [simulatorInitialValues, setSimulatorInitialValues] = useState<{ monthly?: number, initial?: number } | null>(null);
   const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [isPlannerImportOpen, setIsPlannerImportOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isTourActive, setIsTourActive] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -1274,11 +1274,6 @@ export default function App() {
           currentMonth={currentDate}
           goals={goals}
           onManageGoals={() => setIsGoalsModalOpen(true)}
-          onImport={handleSmartImport}
-          onFullRestore={({ allData: restoredData, goals: restoredGoals }) => {
-            handleImportData(restoredData);
-            if (restoredGoals) setGoals(restoredGoals);
-          }}
           accountsTotal={accountsTotal}
           isDarkMode={isDarkMode}
           toggleTheme={toggleTheme}
@@ -1454,17 +1449,6 @@ export default function App() {
                               currentView === 'planner' ? 'Estratégia' : ''}
                     </h1>
                   </div>
-
-                  {/* 💻 Importação Inteligente (Desktop) — contracheque (entrada) ou nota/recibo (saída) */}
-                  {currentView === 'planner' && (
-                    <button
-                      onClick={() => setIsPlannerImportOpen(true)}
-                      className="hidden md:flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-2xl shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/35 transition-all font-black text-xs uppercase tracking-wider"
-                    >
-                      <span className="material-symbols-rounded text-base notranslate">upload_file</span>
-                      Importar Extrato
-                    </button>
-                  )}
                 </div>
 
                 <div className="flex items-center gap-3 w-full md:w-auto">
@@ -1475,17 +1459,6 @@ export default function App() {
                       onNext={() => handleMonthChange('next')}
                     />
                   </div>
-
-                  {/* 📱 Importação Inteligente (Mobile — botão compacto) */}
-                  {currentView === 'planner' && (
-                    <button
-                      onClick={() => setIsPlannerImportOpen(true)}
-                      aria-label="Importar extrato"
-                      className="md:hidden w-10 h-10 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20"
-                    >
-                      <span className="material-symbols-rounded text-xl notranslate">upload_file</span>
-                    </button>
-                  )}
 
                   <button onClick={toggleTheme} className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-400 shadow-sm">
                     <span className="material-symbols-rounded text-xl">{isDarkMode ? 'light_mode' : 'dark_mode'}</span>
@@ -1517,6 +1490,7 @@ export default function App() {
         onChangeView={setCurrentView}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
         onOpenAddTransaction={(type) => setTransactionForm({ isOpen: true, type: type as TransactionType })}
+        onOpenImport={() => setIsImportModalOpen(true)}
       />
 
       <GoalsModal
@@ -1539,19 +1513,20 @@ export default function App() {
         onForceSync={handleForceSync}
       />
 
-      {/* Importação Inteligente a partir da Estratégia (contracheque = entrada, nota/recibo = saída) */}
-      {isPlannerImportOpen && (
+      {/* Importação Inteligente — contracheque (entrada) ou nota/recibo (saída).
+          Ponto único de entrada, acessado pelo menu do "+". */}
+      {isImportModalOpen && (
         <ImportModal
-          isOpen={isPlannerImportOpen}
-          onClose={() => setIsPlannerImportOpen(false)}
+          isOpen={isImportModalOpen}
+          onClose={() => setIsImportModalOpen(false)}
           onImport={(data) => {
             handleSmartImport(data);
-            setIsPlannerImportOpen(false);
+            setIsImportModalOpen(false);
           }}
           onFullRestore={({ allData: restoredData, goals: restoredGoals }) => {
             handleImportData(restoredData);
             if (restoredGoals) setGoals(restoredGoals);
-            setIsPlannerImportOpen(false);
+            setIsImportModalOpen(false);
           }}
           accounts={currentData.accounts}
         />
@@ -1645,6 +1620,20 @@ export default function App() {
                     <span className="text-[13px] font-bold text-slate-700 dark:text-slate-200">{item.label}</span>
                   </button>
                 ))}
+
+                {/* Importar Extrato — ação de lote, separada dos lançamentos unitários acima */}
+                <button
+                  onClick={() => {
+                    setIsImportModalOpen(true);
+                    setIsFanOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-slate-50 dark:hover:bg-white/5 border-t border-slate-100 dark:border-white/5 mt-1.5 pt-2.5"
+                >
+                  <span className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border-2 border-dashed border-slate-300 dark:border-white/15 text-slate-500 dark:text-slate-400">
+                    <span className="material-symbols-rounded text-[20px]">upload_file</span>
+                  </span>
+                  <span className="text-[13px] font-bold text-slate-700 dark:text-slate-200">Importar Extrato</span>
+                </button>
               </div>
             </div>
           ) : (

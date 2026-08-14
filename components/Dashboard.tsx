@@ -3,7 +3,6 @@ import React, { useMemo } from 'react';
 import { FinancialData, Goal } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { SavingsRateIndicator } from './SavingsRateIndicator';
-import { ImportModal } from './ImportModal';
 import { SmartFinancialHealthCard } from './SmartFinancialHealthCard';
 import { SavingsCapacityCard } from './SavingsCapacityCard';
 import { SpendingEfficiencyCard } from './SpendingEfficiencyCard';
@@ -27,8 +26,6 @@ interface DashboardProps {
   currentMonth: Date;
   goals: Goal[];
   onManageGoals?: () => void;
-  onImport?: (data: any) => void;
-  onFullRestore?: (data: { allData: any; goals?: any[] }) => void;
   accountsTotal: number;
   isDarkMode?: boolean;
   toggleTheme?: () => void;
@@ -123,8 +120,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
     collect(data.additionalVariableCosts, 'Variável', 'text-pink-500 bg-pink-50 dark:bg-pink-500/10');
     return items.sort((a, b) => b.value - a.value).slice(0, 5);
   }, [data]);
-
-  const [isImportModalOpen, setIsImportModalOpen] = React.useState(false);
 
   return (
     <div className="space-y-8 animate-fadeIn">
@@ -289,14 +284,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <span className="material-symbols-rounded text-base notranslate">tune</span>
           Personalizar Dashboard
         </button>
-
-        <button
-          onClick={() => setIsImportModalOpen(true)}
-          className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-2xl shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/35 transition-all font-black text-xs uppercase tracking-wider"
-        >
-          <span className="material-symbols-rounded text-base notranslate">upload_file</span>
-          Importar Extrato
-        </button>
       </div>
 
       {/* 📱 Ações de Celular (Mobile Actions - abaixo de md) */}
@@ -307,14 +294,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
         >
           <span className="material-symbols-rounded text-base notranslate">tune</span>
           Personalizar Dashboard
-        </button>
-
-        <button
-          onClick={() => setIsImportModalOpen(true)}
-          className="w-full flex items-center justify-center gap-2 py-3.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-2xl shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/35 transition-all font-black text-xs uppercase tracking-wider"
-        >
-          <span className="material-symbols-rounded text-base notranslate">upload_file</span>
-          Importar Extrato
         </button>
       </div>
 
@@ -624,25 +603,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
       </div>
-
-      {/* Import Modal */}
-      {isImportModalOpen && (
-        <React.Suspense fallback={null}>
-          <ImportModal
-            isOpen={isImportModalOpen}
-            onClose={() => setIsImportModalOpen(false)}
-            onImport={(data) => {
-              if (onImport) onImport(data);
-              setIsImportModalOpen(false);
-            }}
-            onFullRestore={(data) => {
-              if (onFullRestore) onFullRestore(data);
-              setIsImportModalOpen(false);
-            }}
-            accounts={data.accounts}
-          />
-        </React.Suspense>
-      )}
     </div>
   );
 };

@@ -6,6 +6,7 @@ interface MobileNavigationProps {
     onChangeView: (view: 'dashboard' | 'monthly' | 'planner' | 'annual' | 'advisor' | 'simulator' | 'cards' | 'accounts' | 'masterplan') => void;
     onOpenSettings: () => void;
     onOpenAddTransaction: (type?: string) => void;
+    onOpenImport: () => void;
     onShowToast?: (message: string, type: 'success' | 'error' | 'info') => void;
 }
 
@@ -22,7 +23,7 @@ export const ACTION_ITEMS = [
 ];
 
 export const MobileNavigation: React.FC<MobileNavigationProps> = ({
-    currentView, onChangeView, onOpenSettings, onOpenAddTransaction, onShowToast,
+    currentView, onChangeView, onOpenSettings, onOpenAddTransaction, onOpenImport, onShowToast,
 }) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const { user, login, logout }     = useAuth();
@@ -292,6 +293,15 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
                                         </button>
                                     ))}
                                 </div>
+
+                                {/* Importar Extrato — ação de lote, separada dos lançamentos unitários acima */}
+                                <button
+                                    onClick={() => { onOpenImport(); setIsMenuOpen(false); }}
+                                    className="mt-3 w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-dashed border-slate-300 dark:border-white/15 text-slate-500 dark:text-slate-400 active:scale-[0.98] transition-all"
+                                >
+                                    <span className="material-symbols-rounded text-[18px]">upload_file</span>
+                                    <span className="text-[11px] font-bold uppercase tracking-wider">Importar Extrato</span>
+                                </button>
                             </div>
 
                             {/* Close Button - Center Bottom */}
