@@ -49,6 +49,16 @@ Leveraging **Google Gemini API** to process bank statements (PDFs), invoices, an
    ```bash
    npm run dev
    ```
+   
+   **Access from mobile on the same network**:
+   ```bash
+   npm run dev:mobile
+   ```
+   Then open your mobile browser and navigate to: `http://<your-computer-ip>:3000`
+   
+   To find your computer's IP address:
+   - **macOS/Linux**: `ifconfig | grep "inet "`
+   - **Windows**: `ipconfig` (look for IPv4 Address)
 
 ## 🔒 Security & Privacy
 Finexus is designed to be a private dashboard. All sensitive data is either stored in your private Firebase instance or handled locally.

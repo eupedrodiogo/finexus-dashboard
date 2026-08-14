@@ -10,6 +10,13 @@ export default defineConfig(({ mode }) => {
       // Respeita a porta atribuída pelo ambiente (permite rodar mais de um dev server)
       port: Number(process.env.PORT) || 3000,
       host: '0.0.0.0',
+      // Configuração para acesso em dispositivos móveis na mesma rede
+      middlewareMode: false,
+      hmr: {
+        protocol: 'ws',
+        host: '0.0.0.0',
+        port: Number(process.env.PORT) || 3000,
+      }
     },
     plugins: [
       react(),
