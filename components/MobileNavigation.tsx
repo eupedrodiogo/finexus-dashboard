@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface MobileNavigationProps {
@@ -37,11 +37,26 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
     const navItemsLeft  = [
         { id: 'dashboard', icon: 'dashboard',    label: 'Início',  view: 'dashboard' },
         { id: 'planner',   icon: 'edit_calendar',label: 'Planejar',view: 'planner'   },
+        { id: 'accounts',  icon: 'account_balance', label: 'Contas', view: 'accounts' },
     ];
     const navItemsRight = [
-        { id: 'monthly', icon: 'receipt_long', label: 'Extrato', view: 'monthly' },
-        { id: 'accounts', icon: 'account_balance', label: 'Contas', view: 'accounts' },
+        { id: 'cards',   icon: 'credit_card',  label: 'Cartão',    view: 'cards'  },
+        { id: 'monthly', icon: 'receipt_long', label: 'Extrato',   view: 'monthly' },
+        { id: 'annual',  icon: 'bar_chart',    label: 'Relatório', view: 'annual'  },
     ];
+
+    // Deslizar de baixo pra cima em qualquer ponto da barra abre a mesma folha
+    // do botão "Menu" antigo (agora removido — vira gesto em vez de ícone).
+    const touchStartY = useRef<number | null>(null);
+    const handleBarTouchStart = (e: React.TouchEvent) => {
+        touchStartY.current = e.touches[0].clientY;
+    };
+    const handleBarTouchEnd = (e: React.TouchEvent) => {
+        if (touchStartY.current === null) return;
+        const deltaY = touchStartY.current - e.changedTouches[0].clientY;
+        if (deltaY > 40) setIsMenuOpen(true);
+        touchStartY.current = null;
+    };
 
     const navigate = (view: typeof currentView) => { onChangeView(view); setIsMenuOpen(false); };
 
@@ -76,11 +91,12 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
             ══════════════════════════════════════════════════════════════ */}
             <div className="fixed bottom-0 left-0 right-0 md:hidden pb-safe transition-all duration-400 z-50">
                 <div
+                    onTouchStart={handleBarTouchStart}
+                    onTouchEnd={handleBarTouchEnd}
                     className="relative mx-3 mb-3 h-[62px] flex items-center px-2 rounded-[28px] transition-all duration-400 backdrop-blur-xl bg-white/90 dark:bg-slate-900/90 shadow-[0_8px_32px_rgba(0,0,0,0.1)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.45),inset_0_0_0_1px_rgba(255,255,255,0.06)] border border-slate-200/50 dark:border-transparent"
                 >
-                    {/* Metade esquerda e direita em containers flex-1 iguais — garante que o
-                        vão reservado pro "+" fique exatamente no centro da barra, mesmo com
-                        contagens diferentes de ícone de cada lado (2 à esquerda, 3 à direita). */}
+                    {/* Metade esquerda e direita em containers flex-1 iguais (3 ícones cada) —
+                        garante que o vão reservado pro "+" fique exatamente no centro da barra. */}
                     <div className="flex-1 flex items-center justify-around h-full">
                         {navItemsLeft.map((item) => (
                             <button
@@ -94,7 +110,7 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
                                 <span className={`material-symbols-rounded text-[22px] transition-all duration-300 ${currentView === item.view ? 'icon-filled text-indigo-600 dark:text-indigo-400' : 'text-slate-500'}`}>
                                     {item.icon}
                                 </span>
-                                <span className={`text-[9px] font-bold tracking-wide ${currentView === item.view ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-600 dark:text-slate-400'}`}>
+                                <span className={`text-[10px] font-bold tracking-wide ${currentView === item.view ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-600 dark:text-slate-400'}`}>
                                     {item.label}
                                 </span>
                             </button>
@@ -106,19 +122,19 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
                     <div className="w-14 h-full shrink-0" />
 
                     <div className="flex-1 flex items-center justify-around h-full">
-                        {[...navItemsRight, { id: 'menu', icon: 'menu', label: 'Menu', view: null }].map((item) => (
+                        {navItemsRight.map((item) => (
                             <button
                                 key={item.id}
-                                onClick={() => item.view ? onChangeView(item.view as any) : setIsMenuOpen(true)}
+                                onClick={() => onChangeView(item.view as any)}
                                 className="relative flex flex-col items-center justify-center gap-1 w-14 h-full transition-all active:scale-90"
                             >
-                                {item.view && currentView === item.view && (
+                                {currentView === item.view && (
                                     <span className="absolute inset-0 rounded-2xl bg-indigo-500/10 dark:bg-indigo-400/15" />
                                 )}
-                                <span className={`material-symbols-rounded text-[22px] transition-all duration-300 ${item.view && currentView === item.view ? 'icon-filled text-indigo-600 dark:text-indigo-400' : 'text-slate-500'}`}>
+                                <span className={`material-symbols-rounded text-[22px] transition-all duration-300 ${currentView === item.view ? 'icon-filled text-indigo-600 dark:text-indigo-400' : 'text-slate-500'}`}>
                                     {item.icon}
                                 </span>
-                                <span className={`text-[9px] font-bold tracking-wide ${item.view && currentView === item.view ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-600 dark:text-slate-400'}`}>
+                                <span className={`text-[10px] font-bold tracking-wide ${currentView === item.view ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-600 dark:text-slate-400'}`}>
                                     {item.label}
                                 </span>
                             </button>
@@ -132,7 +148,7 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
                         que já ficam em evidência logo abaixo do cabeçalho. */}
                     <button
                         onClick={() => onOpenAddTransaction('expense')}
-                        className="absolute left-1/2 -translate-x-1/2 -top-9 flex items-center justify-center active:scale-90 transition-transform"
+                        className="absolute left-1/2 -translate-x-1/2 -top-6 flex items-center justify-center active:scale-90 transition-transform"
                     >
                         {/* Anel de glow */}
                         <span
