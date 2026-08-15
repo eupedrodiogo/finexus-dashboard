@@ -20,7 +20,7 @@ import { MonthNavigator } from './components/MonthNavigator';
 import { CreditCardsView } from './components/CreditCardsView';
 import { AccountsView } from './components/AccountsView';
 import { AddTransactionModal, NewTransactionData, TransactionType } from './components/AddTransactionModal';
-import { MobileNavigation, ACTION_ITEMS } from './components/MobileNavigation';
+import { MobileNavigation, ACTION_ITEMS, ALL_BAR_ITEMS, DEFAULT_BAR_ORDER, BAR_ORDER_STORAGE_KEY } from './components/MobileNavigation';
 import { OnboardingModal } from './components/OnboardingModal';
 import { InterfaceTour, TourStep } from './components/InterfaceTour';
 import { RecurringDeleteModal, RecurringDeletePayload } from './components/RecurringDeleteModal';
@@ -295,6 +295,31 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('prosperaNexusUserName', userName);
   }, [userName]);
+
+  // Personalização da barra inferior (mobile): quais atalhos aparecem e em que ordem.
+  // Ids inválidos (de uma versão antiga de ALL_BAR_ITEMS) são descartados na leitura.
+  const [barOrder, setBarOrder] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(BAR_ORDER_STORAGE_KEY);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            const validIds = new Set(ALL_BAR_ITEMS.map(i => i.id));
+            const filtered = parsed.filter((id: string) => validIds.has(id));
+            if (filtered.length > 0) return filtered;
+          }
+        } catch (e) {
+          console.error('Failed to parse bar order', e);
+        }
+      }
+    }
+    return DEFAULT_BAR_ORDER;
+  });
+
+  useEffect(() => {
+    localStorage.setItem(BAR_ORDER_STORAGE_KEY, JSON.stringify(barOrder));
+  }, [barOrder]);
 
   // Toast Handler
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -1491,6 +1516,7 @@ export default function App() {
         onOpenSettings={() => setIsSettingsModalOpen(true)}
         onOpenAddTransaction={(type) => setTransactionForm({ isOpen: true, type: type as TransactionType })}
         onOpenImport={() => setIsImportModalOpen(true)}
+        barOrder={barOrder}
       />
 
       <GoalsModal
@@ -1511,6 +1537,8 @@ export default function App() {
         onImport={handleImportData}
         onReset={handleResetData}
         onForceSync={handleForceSync}
+        barOrder={barOrder}
+        onChangeBarOrder={setBarOrder}
       />
 
       {/* Importação Inteligente — contracheque (entrada) ou nota/recibo (saída).

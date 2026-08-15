@@ -3,6 +3,7 @@ import React, { useRef } from 'react';
 import { Modal } from './Modal';
 import { FinancialData, CreditCard, Goal } from '../types';
 import { generateCSV } from '../utils';
+import { ALL_BAR_ITEMS } from './MobileNavigation';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -15,10 +16,29 @@ interface SettingsModalProps {
     onReset: () => void;
     onForceSync: () => void;
     onPushSync: () => void;
+    /** Ids de ALL_BAR_ITEMS visíveis na barra inferior (mobile), na ordem exibida. */
+    barOrder: string[];
+    onChangeBarOrder: (order: string[]) => void;
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, allData, goals, userName, onUpdateUserName, onImport, onReset, onForceSync, onPushSync }) => {
+export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, allData, goals, userName, onUpdateUserName, onImport, onReset, onForceSync, onPushSync, barOrder, onChangeBarOrder }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const visibleBarItems = barOrder
+        .map(id => ALL_BAR_ITEMS.find(item => item.id === id))
+        .filter((item): item is typeof ALL_BAR_ITEMS[number] => !!item);
+    const hiddenBarItems = ALL_BAR_ITEMS.filter(item => !barOrder.includes(item.id));
+
+    const moveBarItem = (id: string, direction: -1 | 1) => {
+        const idx = barOrder.indexOf(id);
+        const swapWith = idx + direction;
+        if (idx === -1 || swapWith < 0 || swapWith >= barOrder.length) return;
+        const next = [...barOrder];
+        [next[idx], next[swapWith]] = [next[swapWith], next[idx]];
+        onChangeBarOrder(next);
+    };
+    const hideBarItem = (id: string) => onChangeBarOrder(barOrder.filter(i => i !== id));
+    const showBarItem = (id: string) => onChangeBarOrder([...barOrder, id]);
 
     const handleExport = () => {
         const backupData = {
@@ -86,6 +106,68 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, a
                                 />
                             </div>
                         </div>
+                    </div>
+
+                    <hr className="border-slate-100 dark:border-slate-800/50" />
+
+                    {/* Personalizar Menu — quais atalhos aparecem na barra inferior (mobile)
+                        e em que ordem. O "+" central não entra aqui, é fixo. */}
+                    <div className="space-y-3">
+                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Personalizar Menu (Barra Inferior)</label>
+
+                        <div className="space-y-2">
+                            {visibleBarItems.map((item, idx) => (
+                                <div key={item.id} className="w-full flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-100 dark:border-white/5">
+                                    <div className="w-9 h-9 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/5 flex items-center justify-center text-slate-500 dark:text-slate-400 shrink-0">
+                                        <span className="material-symbols-rounded notranslate text-[18px]">{item.icon}</span>
+                                    </div>
+                                    <p className="flex-1 font-bold text-sm text-slate-700 dark:text-slate-200">{item.label}</p>
+                                    <button
+                                        onClick={() => moveBarItem(item.id, -1)}
+                                        disabled={idx === 0}
+                                        className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 dark:text-slate-400 disabled:opacity-25 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
+                                    >
+                                        <span className="material-symbols-rounded notranslate text-[18px]">arrow_upward</span>
+                                    </button>
+                                    <button
+                                        onClick={() => moveBarItem(item.id, 1)}
+                                        disabled={idx === visibleBarItems.length - 1}
+                                        className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 dark:text-slate-400 disabled:opacity-25 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
+                                    >
+                                        <span className="material-symbols-rounded notranslate text-[18px]">arrow_downward</span>
+                                    </button>
+                                    <button
+                                        onClick={() => hideBarItem(item.id)}
+                                        className="w-8 h-8 rounded-lg flex items-center justify-center text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors"
+                                        title="Ocultar da barra"
+                                    >
+                                        <span className="material-symbols-rounded notranslate text-[18px]">visibility_off</span>
+                                    </button>
+                                </div>
+                            ))}
+                            {visibleBarItems.length === 0 && (
+                                <p className="text-xs text-slate-400 text-center py-3">Nenhum atalho visível. Adicione algum abaixo.</p>
+                            )}
+                        </div>
+
+                        {hiddenBarItems.length > 0 && (
+                            <div className="pt-2">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Ocultos — toque pra adicionar</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {hiddenBarItems.map(item => (
+                                        <button
+                                            key={item.id}
+                                            onClick={() => showBarItem(item.id)}
+                                            className="flex items-center gap-2 pl-2 pr-3 py-2 bg-slate-50 dark:bg-slate-800/60 rounded-full border border-dashed border-slate-300 dark:border-white/15 text-slate-500 dark:text-slate-400 hover:border-indigo-300 dark:hover:border-indigo-500/40 transition-colors"
+                                        >
+                                            <span className="material-symbols-rounded notranslate text-[16px]">add_circle</span>
+                                            <span className="material-symbols-rounded notranslate text-[16px]">{item.icon}</span>
+                                            <span className="text-xs font-bold">{item.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <hr className="border-slate-100 dark:border-slate-800/50" />

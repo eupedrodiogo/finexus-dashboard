@@ -8,7 +8,30 @@ interface MobileNavigationProps {
     onOpenAddTransaction: (type?: string) => void;
     onOpenImport: () => void;
     onShowToast?: (message: string, type: 'success' | 'error' | 'info') => void;
+    /** Ids de ALL_BAR_ITEMS, na ordem escolhida pelo usuário em "Personalizar Menu"
+        (Configurações). O "+" não entra aqui — é fixo, sempre no centro. */
+    barOrder: string[];
 }
+
+// ── Itens disponíveis pra barra inferior ───────────────────────────────────────────
+// Fonte única usada tanto pra renderizar a barra quanto pra tela de personalização
+// em Configurações — evita as duas telas descreverem os mesmos destinos de forma
+// diferente.
+export const ALL_BAR_ITEMS = [
+    { id: 'dashboard',  icon: 'dashboard',       label: 'Início',      view: 'dashboard'  as const },
+    { id: 'planner',    icon: 'edit_calendar',   label: 'Planejar',    view: 'planner'    as const },
+    { id: 'accounts',   icon: 'account_balance', label: 'Contas',      view: 'accounts'   as const },
+    { id: 'cards',      icon: 'credit_card',     label: 'Cartão',      view: 'cards'      as const },
+    { id: 'monthly',    icon: 'receipt_long',    label: 'Extrato',     view: 'monthly'    as const },
+    { id: 'annual',     icon: 'bar_chart',       label: 'Relatório',   view: 'annual'     as const },
+    { id: 'masterplan', icon: 'ads_click',       label: 'Master Plan', view: 'masterplan' as const },
+    { id: 'advisor',    icon: 'psychology',      label: 'IA Advisor',  view: 'advisor'    as const },
+    { id: 'simulator',  icon: 'trending_up',     label: 'Simulador',   view: 'simulator'  as const },
+];
+
+export const DEFAULT_BAR_ORDER = ['dashboard', 'planner', 'accounts', 'cards', 'monthly', 'annual'];
+
+export const BAR_ORDER_STORAGE_KEY = 'prosperaNexusBarOrder';
 
 // ── Action items config ────────────────────────────────────────────────────────────
 // Exportado para o FAB do desktop (App.tsx) usar exatamente as mesmas cores,
@@ -23,7 +46,7 @@ export const ACTION_ITEMS = [
 ];
 
 export const MobileNavigation: React.FC<MobileNavigationProps> = ({
-    currentView, onChangeView, onOpenSettings, onOpenAddTransaction, onOpenImport, onShowToast,
+    currentView, onChangeView, onOpenSettings, onOpenAddTransaction, onOpenImport, onShowToast, barOrder,
 }) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const { user, login, logout }     = useAuth();
@@ -34,16 +57,16 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
         return () => { document.body.style.overflow = ''; };
     }, [isMenuOpen]);
 
-    const navItemsLeft  = [
-        { id: 'dashboard', icon: 'dashboard',    label: 'Início',  view: 'dashboard' },
-        { id: 'planner',   icon: 'edit_calendar',label: 'Planejar',view: 'planner'   },
-        { id: 'accounts',  icon: 'account_balance', label: 'Contas', view: 'accounts' },
-    ];
-    const navItemsRight = [
-        { id: 'cards',   icon: 'credit_card',  label: 'Cartão',    view: 'cards'  },
-        { id: 'monthly', icon: 'receipt_long', label: 'Extrato',   view: 'monthly' },
-        { id: 'annual',  icon: 'bar_chart',    label: 'Relatório', view: 'annual'  },
-    ];
+    // Resolve os ids escolhidos em Configurações pros itens completos (ícone/label/view),
+    // descartando ids inválidos, e divide ao meio pros dois lados do "+". Sem limite de
+    // quantidade — se não couber tudo, cada metade rola horizontalmente (ver className
+    // overflow-x-auto abaixo) em vez de espremer os ícones até ficarem ilegíveis.
+    const visibleBarItems = barOrder
+        .map(id => ALL_BAR_ITEMS.find(item => item.id === id))
+        .filter((item): item is typeof ALL_BAR_ITEMS[number] => !!item);
+    const halfIdx = Math.ceil(visibleBarItems.length / 2);
+    const navItemsLeft  = visibleBarItems.slice(0, halfIdx);
+    const navItemsRight = visibleBarItems.slice(halfIdx);
 
     // Deslizar de baixo pra cima em qualquer ponto da barra abre a mesma folha
     // do botão "Menu" antigo (agora removido — vira gesto em vez de ícone).
@@ -95,14 +118,17 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
                     onTouchEnd={handleBarTouchEnd}
                     className="relative mx-2 mb-3 h-[62px] flex items-center px-1 rounded-[28px] transition-all duration-400 backdrop-blur-xl bg-white/90 dark:bg-slate-900/90 shadow-[0_8px_32px_rgba(0,0,0,0.1)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.45),inset_0_0_0_1px_rgba(255,255,255,0.06)] border border-slate-200/50 dark:border-transparent"
                 >
-                    {/* Metade esquerda e direita em containers flex-1 iguais (3 ícones cada) —
-                        garante que o vão reservado pro "+" fique exatamente no centro da barra. */}
-                    <div className="flex-1 flex items-center justify-around h-full">
+                    {/* Metade esquerda e direita em containers flex-1 iguais — garante que o vão
+                        reservado pro "+" fique exatamente no centro da barra. A quantidade de
+                        ícones é definida pelo usuário em Configurações > Personalizar Menu, sem
+                        limite fixo; se não couber tudo, cada metade rola horizontalmente em vez
+                        de espremer os ícones. */}
+                    <div className="flex-1 flex items-center justify-around h-full overflow-x-auto no-scrollbar">
                         {navItemsLeft.map((item) => (
                             <button
                                 key={item.id}
                                 onClick={() => onChangeView(item.view as any)}
-                                className="relative flex flex-col items-center justify-center gap-1 w-12 h-full transition-all active:scale-90"
+                                className="relative flex flex-col items-center justify-center gap-1 w-12 h-full shrink-0 transition-all active:scale-90"
                             >
                                 {currentView === item.view && (
                                     <span className="absolute inset-0 rounded-2xl bg-indigo-500/10 dark:bg-indigo-400/15" />
@@ -122,12 +148,12 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
                         Cartão, que ficam logo ao lado. */}
                     <div className="w-20 h-full shrink-0" />
 
-                    <div className="flex-1 flex items-center justify-around h-full">
+                    <div className="flex-1 flex items-center justify-around h-full overflow-x-auto no-scrollbar">
                         {navItemsRight.map((item) => (
                             <button
                                 key={item.id}
                                 onClick={() => onChangeView(item.view as any)}
-                                className="relative flex flex-col items-center justify-center gap-1 w-12 h-full transition-all active:scale-90"
+                                className="relative flex flex-col items-center justify-center gap-1 w-12 h-full shrink-0 transition-all active:scale-90"
                             >
                                 {currentView === item.view && (
                                     <span className="absolute inset-0 rounded-2xl bg-indigo-500/10 dark:bg-indigo-400/15" />
