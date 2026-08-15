@@ -76,32 +76,63 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
             ══════════════════════════════════════════════════════════════ */}
             <div className="fixed bottom-0 left-0 right-0 md:hidden pb-safe transition-all duration-400 z-50">
                 <div
-                    className="mx-3 mb-3 h-[62px] flex items-center justify-around px-2 rounded-[28px] transition-all duration-400 backdrop-blur-xl bg-white/90 dark:bg-slate-900/90 shadow-[0_8px_32px_rgba(0,0,0,0.1)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.45),inset_0_0_0_1px_rgba(255,255,255,0.06)] border border-slate-200/50 dark:border-transparent"
+                    className="relative mx-3 mb-3 h-[62px] flex items-center px-2 rounded-[28px] transition-all duration-400 backdrop-blur-xl bg-white/90 dark:bg-slate-900/90 shadow-[0_8px_32px_rgba(0,0,0,0.1)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.45),inset_0_0_0_1px_rgba(255,255,255,0.06)] border border-slate-200/50 dark:border-transparent"
                 >
-                    {navItemsLeft.map((item) => (
-                        <button
-                            key={item.id}
-                            onClick={() => onChangeView(item.view as any)}
-                            className="relative flex flex-col items-center justify-center gap-1 w-14 h-full transition-all active:scale-90"
-                        >
-                            {currentView === item.view && (
-                                <span className="absolute inset-0 rounded-2xl bg-indigo-500/10 dark:bg-indigo-400/15" />
-                            )}
-                            <span className={`material-symbols-rounded text-[22px] transition-all duration-300 ${currentView === item.view ? 'icon-filled text-indigo-600 dark:text-indigo-400' : 'text-slate-500'}`}>
-                                {item.icon}
-                            </span>
-                            <span className={`text-[9px] font-bold tracking-wide ${currentView === item.view ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-600 dark:text-slate-400'}`}>
-                                {item.label}
-                            </span>
-                        </button>
-                    ))}
+                    {/* Metade esquerda e direita em containers flex-1 iguais — garante que o
+                        vão reservado pro "+" fique exatamente no centro da barra, mesmo com
+                        contagens diferentes de ícone de cada lado (2 à esquerda, 3 à direita). */}
+                    <div className="flex-1 flex items-center justify-around h-full">
+                        {navItemsLeft.map((item) => (
+                            <button
+                                key={item.id}
+                                onClick={() => onChangeView(item.view as any)}
+                                className="relative flex flex-col items-center justify-center gap-1 w-14 h-full transition-all active:scale-90"
+                            >
+                                {currentView === item.view && (
+                                    <span className="absolute inset-0 rounded-2xl bg-indigo-500/10 dark:bg-indigo-400/15" />
+                                )}
+                                <span className={`material-symbols-rounded text-[22px] transition-all duration-300 ${currentView === item.view ? 'icon-filled text-indigo-600 dark:text-indigo-400' : 'text-slate-500'}`}>
+                                    {item.icon}
+                                </span>
+                                <span className={`text-[9px] font-bold tracking-wide ${currentView === item.view ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-600 dark:text-slate-400'}`}>
+                                    {item.label}
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Vão reservado — o "+" flutua centralizado sobre este espaço, não faz
+                        parte do fluxo flex dos ícones de navegação. */}
+                    <div className="w-14 h-full shrink-0" />
+
+                    <div className="flex-1 flex items-center justify-around h-full">
+                        {[...navItemsRight, { id: 'menu', icon: 'menu', label: 'Menu', view: null }].map((item) => (
+                            <button
+                                key={item.id}
+                                onClick={() => item.view ? onChangeView(item.view as any) : setIsMenuOpen(true)}
+                                className="relative flex flex-col items-center justify-center gap-1 w-14 h-full transition-all active:scale-90"
+                            >
+                                {item.view && currentView === item.view && (
+                                    <span className="absolute inset-0 rounded-2xl bg-indigo-500/10 dark:bg-indigo-400/15" />
+                                )}
+                                <span className={`material-symbols-rounded text-[22px] transition-all duration-300 ${item.view && currentView === item.view ? 'icon-filled text-indigo-600 dark:text-indigo-400' : 'text-slate-500'}`}>
+                                    {item.icon}
+                                </span>
+                                <span className={`text-[9px] font-bold tracking-wide ${item.view && currentView === item.view ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-600 dark:text-slate-400'}`}>
+                                    {item.label}
+                                </span>
+                            </button>
+                        ))}
+                    </div>
 
                     {/* FAB central — atalho direto pro lançamento mais comum (Despesa).
+                        Fica fora do fluxo (absolute), flutuando acima do vão reservado, sempre
+                        no centro exato da barra, não importa quantos ícones tenham de cada lado.
                         Quem quiser outro tipo troca dentro do próprio modal, nas abas
                         que já ficam em evidência logo abaixo do cabeçalho. */}
                     <button
                         onClick={() => onOpenAddTransaction('expense')}
-                        className="relative flex items-center justify-center w-14 h-full active:scale-90 transition-transform -translate-y-8"
+                        className="absolute left-1/2 -translate-x-1/2 -top-9 flex items-center justify-center active:scale-90 transition-transform"
                     >
                         {/* Anel de glow */}
                         <span
@@ -115,35 +146,6 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
                                 add
                             </span>
                         </span>
-                    </button>
-
-                    {navItemsRight.map((item) => (
-                        <button
-                            key={item.id}
-                            onClick={() => onChangeView(item.view as any)}
-                            className="relative flex flex-col items-center justify-center gap-1 w-14 h-full transition-all active:scale-90"
-                        >
-                            {currentView === item.view && (
-                                <span className="absolute inset-0 rounded-2xl bg-indigo-500/10 dark:bg-indigo-400/15" />
-                            )}
-                            <span className={`material-symbols-rounded text-[22px] transition-all duration-300 ${currentView === item.view ? 'icon-filled text-indigo-600 dark:text-indigo-400' : 'text-slate-500'}`}>
-                                {item.icon}
-                            </span>
-                            <span className={`text-[9px] font-bold tracking-wide ${currentView === item.view ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-600 dark:text-slate-400'}`}>
-                                {item.label}
-                            </span>
-                        </button>
-                    ))}
-
-                    {/* Menu — assume a função que o "+" tinha antes: abre a folha com
-                        navegação completa, ferramentas extras, os outros tipos de
-                        lançamento e a importação de extrato. */}
-                    <button
-                        onClick={() => setIsMenuOpen(true)}
-                        className="relative flex flex-col items-center justify-center gap-1 w-14 h-full transition-all active:scale-90"
-                    >
-                        <span className="material-symbols-rounded text-[22px] text-slate-500">menu</span>
-                        <span className="text-[9px] font-bold tracking-wide text-slate-600 dark:text-slate-400">Menu</span>
                     </button>
                 </div>
             </div>
