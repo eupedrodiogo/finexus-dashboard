@@ -96,9 +96,11 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
                         </button>
                     ))}
 
-                    {/* FAB central */}
+                    {/* FAB central — atalho direto pro lançamento mais comum (Despesa).
+                        Quem quiser outro tipo troca dentro do próprio modal, nas abas
+                        que já ficam em evidência logo abaixo do cabeçalho. */}
                     <button
-                        onClick={() => setIsMenuOpen(true)}
+                        onClick={() => onOpenAddTransaction('expense')}
                         className="relative flex items-center justify-center w-14 h-full active:scale-90 transition-transform"
                     >
                         {/* Anel de glow */}
@@ -132,6 +134,17 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
                             </span>
                         </button>
                     ))}
+
+                    {/* Menu — assume a função que o "+" tinha antes: abre a folha com
+                        navegação completa, ferramentas extras, os outros tipos de
+                        lançamento e a importação de extrato. */}
+                    <button
+                        onClick={() => setIsMenuOpen(true)}
+                        className="relative flex flex-col items-center justify-center gap-1 w-14 h-full transition-all active:scale-90"
+                    >
+                        <span className="material-symbols-rounded text-[22px] text-slate-500">menu</span>
+                        <span className="text-[9px] font-bold tracking-wide text-slate-600 dark:text-slate-400">Menu</span>
+                    </button>
                 </div>
             </div>
 
