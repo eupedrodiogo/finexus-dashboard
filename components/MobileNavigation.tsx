@@ -101,17 +101,17 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
                         que já ficam em evidência logo abaixo do cabeçalho. */}
                     <button
                         onClick={() => onOpenAddTransaction('expense')}
-                        className="relative flex items-center justify-center w-14 h-full active:scale-90 transition-transform"
+                        className="relative flex items-center justify-center w-14 h-full active:scale-90 transition-transform -translate-y-4"
                     >
                         {/* Anel de glow */}
                         <span
-                            className="absolute w-12 h-12 rounded-2xl animate-ping transition-opacity duration-300 opacity-[0.18]"
+                            className="absolute w-14 h-14 rounded-2xl animate-ping transition-opacity duration-300 opacity-[0.18]"
                             style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)' }}
                         />
                         <span
-                            className="relative w-12 h-12 rounded-2xl flex items-center justify-center overflow-hidden transition-all duration-400 bg-gradient-to-br from-indigo-500 to-purple-500 shadow-[0_4px_18px_rgba(99,102,241,0.5)] border border-white/20"
+                            className="relative w-14 h-14 rounded-2xl flex items-center justify-center overflow-hidden transition-all duration-400 bg-gradient-to-br from-indigo-500 to-purple-500 shadow-[0_8px_24px_rgba(99,102,241,0.55)] border-4 border-white dark:border-slate-900"
                         >
-                            <span className="material-symbols-rounded text-[24px] text-white">
+                            <span className="material-symbols-rounded text-[28px] text-white">
                                 add
                             </span>
                         </span>
