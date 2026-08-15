@@ -93,7 +93,7 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
                 <div
                     onTouchStart={handleBarTouchStart}
                     onTouchEnd={handleBarTouchEnd}
-                    className="relative mx-3 mb-3 h-[62px] flex items-center px-2 rounded-[28px] transition-all duration-400 backdrop-blur-xl bg-white/90 dark:bg-slate-900/90 shadow-[0_8px_32px_rgba(0,0,0,0.1)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.45),inset_0_0_0_1px_rgba(255,255,255,0.06)] border border-slate-200/50 dark:border-transparent"
+                    className="relative mx-2 mb-3 h-[62px] flex items-center px-1 rounded-[28px] transition-all duration-400 backdrop-blur-xl bg-white/90 dark:bg-slate-900/90 shadow-[0_8px_32px_rgba(0,0,0,0.1)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.45),inset_0_0_0_1px_rgba(255,255,255,0.06)] border border-slate-200/50 dark:border-transparent"
                 >
                     {/* Metade esquerda e direita em containers flex-1 iguais (3 ícones cada) —
                         garante que o vão reservado pro "+" fique exatamente no centro da barra. */}
@@ -102,7 +102,7 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
                             <button
                                 key={item.id}
                                 onClick={() => onChangeView(item.view as any)}
-                                className="relative flex flex-col items-center justify-center gap-1 w-14 h-full transition-all active:scale-90"
+                                className="relative flex flex-col items-center justify-center gap-1 w-12 h-full transition-all active:scale-90"
                             >
                                 {currentView === item.view && (
                                     <span className="absolute inset-0 rounded-2xl bg-indigo-500/10 dark:bg-indigo-400/15" />
@@ -119,14 +119,14 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
 
                     {/* Vão reservado — o "+" flutua centralizado sobre este espaço, não faz
                         parte do fluxo flex dos ícones de navegação. */}
-                    <div className="w-14 h-full shrink-0" />
+                    <div className="w-11 h-full shrink-0" />
 
                     <div className="flex-1 flex items-center justify-around h-full">
                         {navItemsRight.map((item) => (
                             <button
                                 key={item.id}
                                 onClick={() => onChangeView(item.view as any)}
-                                className="relative flex flex-col items-center justify-center gap-1 w-14 h-full transition-all active:scale-90"
+                                className="relative flex flex-col items-center justify-center gap-1 w-12 h-full transition-all active:scale-90"
                             >
                                 {currentView === item.view && (
                                     <span className="absolute inset-0 rounded-2xl bg-indigo-500/10 dark:bg-indigo-400/15" />
@@ -148,7 +148,7 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
                         que já ficam em evidência logo abaixo do cabeçalho. */}
                     <button
                         onClick={() => onOpenAddTransaction('expense')}
-                        className="absolute left-1/2 -translate-x-1/2 -top-6 flex items-center justify-center active:scale-90 transition-transform"
+                        className="absolute left-1/2 -translate-x-1/2 -top-[22px] flex items-center justify-center active:scale-90 transition-transform"
                     >
                         {/* Anel de glow */}
                         <span
