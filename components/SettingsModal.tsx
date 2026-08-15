@@ -19,9 +19,17 @@ interface SettingsModalProps {
     /** Ids de ALL_BAR_ITEMS visíveis na barra inferior (mobile), na ordem exibida. */
     barOrder: string[];
     onChangeBarOrder: (order: string[]) => void;
+    fontScale: 'small' | 'medium' | 'large';
+    onChangeFontScale: (scale: 'small' | 'medium' | 'large') => void;
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, allData, goals, userName, onUpdateUserName, onImport, onReset, onForceSync, onPushSync, barOrder, onChangeBarOrder }) => {
+const FONT_SCALE_OPTIONS: { id: 'small' | 'medium' | 'large'; label: string }[] = [
+    { id: 'small',  label: 'Pequena' },
+    { id: 'medium', label: 'Média'   },
+    { id: 'large',  label: 'Grande'  },
+];
+
+export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, allData, goals, userName, onUpdateUserName, onImport, onReset, onForceSync, onPushSync, barOrder, onChangeBarOrder, fontScale, onChangeFontScale }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const visibleBarItems = barOrder
@@ -105,6 +113,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, a
                                     placeholder="Nome da Família"
                                 />
                             </div>
+                        </div>
+                    </div>
+
+                    <hr className="border-slate-100 dark:border-slate-800/50" />
+
+                    {/* Tamanho da Fonte — escala o app inteiro (zoom), não só um trecho. */}
+                    <div className="space-y-3">
+                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Tamanho da Fonte</label>
+                        <div className="grid grid-cols-3 gap-2">
+                            {FONT_SCALE_OPTIONS.map(opt => (
+                                <button
+                                    key={opt.id}
+                                    onClick={() => onChangeFontScale(opt.id)}
+                                    className={`flex flex-col items-center gap-1.5 py-3 rounded-2xl border transition-all ${
+                                        fontScale === opt.id
+                                            ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-500/20'
+                                            : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-white/5 text-slate-500 dark:text-slate-400'
+                                    }`}
+                                >
+                                    <span className={`material-symbols-rounded notranslate ${opt.id === 'small' ? 'text-[16px]' : opt.id === 'medium' ? 'text-[20px]' : 'text-[24px]'}`}>
+                                        text_fields
+                                    </span>
+                                    <span className="text-xs font-bold">{opt.label}</span>
+                                </button>
+                            ))}
                         </div>
                     </div>
 

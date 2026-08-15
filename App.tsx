@@ -321,6 +321,23 @@ export default function App() {
     localStorage.setItem(BAR_ORDER_STORAGE_KEY, JSON.stringify(barOrder));
   }, [barOrder]);
 
+  // Tamanho de fonte do app inteiro. A tipografia aqui é toda em px fixo (Tailwind
+  // arbitrary values, ex: text-[9px]), não em rem — então mudar o font-size da raiz
+  // não teria efeito nela. `zoom` escala tudo (fonte, ícones, espaçamentos) de uma vez,
+  // do mesmo jeito que o zoom nativo do navegador, sem precisar reescrever cada
+  // componente pra uma escala relativa.
+  const FONT_SCALE_VALUES = { small: 0.9, medium: 1, large: 1.15 } as const;
+  const [fontScale, setFontScale] = useState<keyof typeof FONT_SCALE_VALUES>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('prosperaNexusFontScale');
+      if (saved === 'small' || saved === 'medium' || saved === 'large') return saved;
+    }
+    return 'medium';
+  });
+  useEffect(() => {
+    localStorage.setItem('prosperaNexusFontScale', fontScale);
+  }, [fontScale]);
+
   // Toast Handler
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     const id = Date.now().toString();
@@ -1428,7 +1445,10 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
+    <div
+      className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-950 transition-colors duration-500"
+      style={{ zoom: FONT_SCALE_VALUES[fontScale] } as React.CSSProperties}
+    >
 
       {/* Desktop Sidebar - Hidden on mobile */}
       <aside
@@ -1539,6 +1559,8 @@ export default function App() {
         onForceSync={handleForceSync}
         barOrder={barOrder}
         onChangeBarOrder={setBarOrder}
+        fontScale={fontScale}
+        onChangeFontScale={setFontScale}
       />
 
       {/* Importação Inteligente — contracheque (entrada) ou nota/recibo (saída).
