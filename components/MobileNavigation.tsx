@@ -117,9 +117,10 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
                         ))}
                     </div>
 
-                    {/* Vão reservado — o "+" flutua centralizado sobre este espaço, não faz
-                        parte do fluxo flex dos ícones de navegação. */}
-                    <div className="w-11 h-full shrink-0" />
+                    {/* Vão reservado — maior que a área clicável do "+" (56px) de propósito,
+                        pra sobrar uma margem de segurança e evitar toque acidental em Contas/
+                        Cartão, que ficam logo ao lado. */}
+                    <div className="w-20 h-full shrink-0" />
 
                     <div className="flex-1 flex items-center justify-around h-full">
                         {navItemsRight.map((item) => (
