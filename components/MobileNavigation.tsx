@@ -132,7 +132,7 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
                         que já ficam em evidência logo abaixo do cabeçalho. */}
                     <button
                         onClick={() => onOpenAddTransaction('expense')}
-                        className="absolute left-1/2 -translate-x-1/2 -top-16 flex items-center justify-center active:scale-90 transition-transform"
+                        className="absolute left-1/2 -translate-x-1/2 -top-9 flex items-center justify-center active:scale-90 transition-transform"
                     >
                         {/* Anel de glow */}
                         <span
