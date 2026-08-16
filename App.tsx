@@ -1503,7 +1503,7 @@ export default function App() {
                                 currentView === 'planner' ? 'Estratégia' : ''}
                       </h1>
                       {currentView === 'planner' && (
-                        <p className="hidden md:block text-sm text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                        <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 font-medium mt-0.5">
                           Planeje suas metas e acompanhe sua performance financeira
                         </p>
                       )}
