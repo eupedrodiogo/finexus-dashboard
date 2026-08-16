@@ -4,7 +4,7 @@ import {
   X, CreditCard, Wallet, Calendar, Hash, Repeat, Save, Plus,
   TrendingDown, TrendingUp, ArrowLeftRight, LineChart, ChevronDown, Settings,
   CheckCircle2, Circle, Eye, EyeOff, AlertTriangle, History, Zap, Layers,
-  Mic, Loader2, Camera
+  Mic, Loader2, Camera, Upload
 } from 'lucide-react';
 import { FinancialData, Category } from '../types';
 import { Transaction } from './TransactionHistory';
@@ -32,6 +32,9 @@ interface AddTransactionModalProps {
   onAddSubCategory?: (categoryId: string, name: string) => void;
   onEditSubCategory?: (categoryId: string, subId: string, newName: string) => void;
   onDeleteSubCategory?: (categoryId: string, subId: string) => void;
+  /** Fecha este modal e abre a importação de extrato — atalho pra quem abriu
+      "Novo Lançamento" mas na verdade quer importar um arquivo em lote. */
+  onOpenImport?: () => void;
 }
 
 export interface NewTransactionData {
@@ -108,7 +111,7 @@ const amountFontClass = (cents: string) =>
 
 export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   isOpen, onClose, currentData, allData, onAddTransaction, dataToEdit, onEditTransaction, initialType,
-  onAddSubCategory, onEditSubCategory, onDeleteSubCategory
+  onAddSubCategory, onEditSubCategory, onDeleteSubCategory, onOpenImport
 }) => {
   const [txType, setTxType]           = useState<TransactionType>(initialType || 'expense');
   const [description, setDescription] = useState('');
@@ -738,6 +741,18 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                   </button>
                 );
               })}
+
+              {/* Importar Extrato — não é um tipo de lançamento, é uma ação de lote;
+                  visual neutro (tracejado) pra não parecer mais uma aba de tipo. */}
+              {onOpenImport && (
+                <button
+                  onClick={() => { onClose(); onOpenImport(); }}
+                  className="flex-shrink-0 flex flex-col items-center gap-1.5 px-3 py-2.5 rounded-2xl transition-all active:scale-95 border border-dashed border-slate-300 dark:border-white/15 text-slate-500 dark:text-slate-400"
+                >
+                  <Upload size={15} />
+                  <span className="text-[8px] font-black uppercase tracking-widest whitespace-nowrap">Importar</span>
+                </button>
+              )}
             </div>
           </div>
         )}

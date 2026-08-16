@@ -1593,6 +1593,10 @@ export default function App() {
           onAddSubCategory={handleAddSubCategory}
           onEditSubCategory={handleEditSubCategory}
           onDeleteSubCategory={handleDeleteSubCategory}
+          onOpenImport={() => {
+            setTransactionForm({ isOpen: false });
+            setIsImportModalOpen(true);
+          }}
         />
       )}
 
