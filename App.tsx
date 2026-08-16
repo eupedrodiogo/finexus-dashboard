@@ -509,7 +509,11 @@ export default function App() {
       }
 
       const timeoutId = setTimeout(() => {
-        saveUserData(user.uid, { allData, goals, userName, lastWriter: sessionId });
+        saveUserData(user.uid, { allData, goals, userName, lastWriter: sessionId })
+          .catch((err) => {
+            console.error('Falha ao salvar na nuvem:', err);
+            showToast('Falha ao sincronizar com a nuvem. Verifique sua conexão.', 'error');
+          });
       }, 2000); // Debounce saves
       return () => clearTimeout(timeoutId);
     }
