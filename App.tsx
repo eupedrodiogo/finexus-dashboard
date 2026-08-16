@@ -1484,15 +1484,30 @@ export default function App() {
             >
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div className="flex items-center gap-4">
-                  <div className="transition-all duration-500 transform data-[scrolled=true]:scale-90">
-                    <h1 className="text-2xl md:text-3xl font-extrabold text-slate-800 dark:text-white tracking-tight flex items-center gap-3">
-                      <span className="md:hidden w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white text-xs">F</span>
-                      {currentView === 'monthly' ? 'Lançamentos' :
-                        currentView === 'annual' ? 'Relatórios' :
-                          currentView === 'cards' ? 'Cartões' :
-                            currentView === 'accounts' ? 'Contas' :
-                              currentView === 'planner' ? 'Estratégia' : ''}
-                    </h1>
+                  <div className="transition-all duration-500 transform data-[scrolled=true]:scale-90 flex items-center gap-3">
+                    <span className="md:hidden w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30 ring-1 ring-white/20 shrink-0">
+                      <span className="material-symbols-rounded text-[22px]">
+                        {currentView === 'monthly' ? 'receipt_long' :
+                          currentView === 'annual' ? 'bar_chart' :
+                            currentView === 'cards' ? 'credit_card' :
+                              currentView === 'accounts' ? 'account_balance' :
+                                currentView === 'planner' ? 'insights' : 'apps'}
+                      </span>
+                    </span>
+                    <div>
+                      <h1 className="text-2xl md:text-3xl font-extrabold text-slate-800 dark:text-white tracking-tight leading-tight">
+                        {currentView === 'monthly' ? 'Lançamentos' :
+                          currentView === 'annual' ? 'Relatórios' :
+                            currentView === 'cards' ? 'Cartões' :
+                              currentView === 'accounts' ? 'Contas' :
+                                currentView === 'planner' ? 'Estratégia' : ''}
+                      </h1>
+                      {currentView === 'planner' && (
+                        <p className="hidden md:block text-sm text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                          Planeje suas metas e acompanhe sua performance financeira
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
 
