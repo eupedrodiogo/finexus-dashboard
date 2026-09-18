@@ -220,14 +220,16 @@ export default function App() {
     */
     {
       targetId: 'sidebar-nav',
+      mobileTargetId: 'mobile-nav-bar',
       title: 'Navegação Completa',
-      description: 'Use a barra lateral para navegar rapidamente entre todos os módulos do sistema.',
+      description: 'Use o menu de navegação (barra lateral no computador ou barra inferior no celular) para percorrer rapidamente todos os módulos do sistema.',
       position: 'fixed-top'
     },
     {
       targetId: 'fab-add',
+      mobileTargetId: 'mobile-fab-add',
       title: 'Lançamento Rápido',
-      description: 'Precisa registrar algo rápido? Use este botão de qualquer lugar do app.',
+      description: 'Precisa registrar algo rápido? Use o botão "+" de qualquer lugar do app.',
       position: 'fixed-top'
     }
   ];

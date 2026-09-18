@@ -114,6 +114,7 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
             ══════════════════════════════════════════════════════════════ */}
             <div className="fixed bottom-0 left-0 right-0 md:hidden pb-safe transition-all duration-400 z-50">
                 <div
+                    id="mobile-nav-bar"
                     onTouchStart={handleBarTouchStart}
                     onTouchEnd={handleBarTouchEnd}
                     className="relative mx-2 mb-3 h-[62px] flex items-center px-1 rounded-[28px] transition-all duration-400 backdrop-blur-xl bg-white/90 dark:bg-slate-900/90 shadow-[0_8px_32px_rgba(0,0,0,0.1)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.45),inset_0_0_0_1px_rgba(255,255,255,0.06)] border border-slate-200/50 dark:border-transparent"
@@ -174,6 +175,7 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
                         Quem quiser outro tipo troca dentro do próprio modal, nas abas
                         que já ficam em evidência logo abaixo do cabeçalho. */}
                     <button
+                        id="mobile-fab-add"
                         onClick={() => onOpenAddTransaction('expense')}
                         className="absolute left-1/2 -translate-x-1/2 -top-[22px] flex items-center justify-center active:scale-90 transition-transform"
                     >

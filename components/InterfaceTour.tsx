@@ -4,6 +4,9 @@ import { X, ChevronRight, ChevronLeft, Sparkles } from 'lucide-react';
 
 export interface TourStep {
     targetId: string;
+    /** Id alternativo a destacar no mobile, para passos cujo alvo desktop
+        (ex: sidebar, FAB de canto) não existe/fica oculto em telas pequenas. */
+    mobileTargetId?: string;
     title: string;
     description: string;
     position: 'top' | 'bottom' | 'left' | 'right' | 'center' | 'fixed-top';
@@ -24,12 +27,27 @@ export const InterfaceTour: React.FC<InterfaceTourProps> = ({ steps, isActive, c
     const [coords, setCoords] = useState({ top: 0, left: 0, width: 0, height: 0 });
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     const containerRef = useRef<HTMLDivElement>(null);
+    const tooltipRef = useRef<HTMLDivElement>(null);
+
+    // Um elemento posicionado dentro de um ancestral com position:fixed (ex: um
+    // botão "relative"/"absolute" dentro da barra inferior fixa) tem sua posição
+    // na tela igualmente imune ao scroll da página, mesmo sem ser "fixed" ele
+    // mesmo — por isso a checagem sobe a árvore em vez de olhar só o elemento.
+    const isPinnedToViewport = (el: HTMLElement): boolean => {
+        let node: HTMLElement | null = el;
+        while (node) {
+            if (window.getComputedStyle(node).position === 'fixed') return true;
+            node = node.parentElement;
+        }
+        return false;
+    };
 
     const updateCoords = useCallback(() => {
         const step = steps[currentStepIdx];
         if (!step) return;
 
-        const element = document.getElementById(step.targetId);
+        const targetId = (isMobile && step.mobileTargetId) ? step.mobileTargetId : step.targetId;
+        const element = document.getElementById(targetId);
         if (element) {
             const rect = element.getBoundingClientRect();
             // Add some padding to the highlight
@@ -41,8 +59,38 @@ export const InterfaceTour: React.FC<InterfaceTourProps> = ({ steps, isActive, c
                 height: rect.height + (padding * 2)
             });
 
-            // Smooth scroll to element
-            element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+            // Alvos presos a um container fixed (ex: barra inferior e FAB do
+            // mobile) já ficam sempre visíveis na tela — rolar a página não os
+            // move e só causaria um salto de scroll sem propósito.
+            const isFixedTarget = isPinnedToViewport(element);
+
+            if (isFixedTarget) {
+                // Nada a fazer: o elemento já está numa posição estável na tela.
+            } else if (isMobile) {
+                // No mobile o tooltip é um bottom sheet fixo que pode cobrir boa
+                // parte da tela: um scrollIntoView 'center' comum não sabe que
+                // esse espaço está reservado e acaba escondendo o elemento
+                // destacado atrás do card. Em vez disso, rolamos a página para
+                // manter o alvo dentro da fatia visível ACIMA do sheet.
+                const sheetHeight = tooltipRef.current?.offsetHeight ?? 280;
+                const sheetBottomOffset = 24; // "bottom: 24" do sheet
+                const sheetGap = 16; // respiro entre o destaque e o sheet
+                const topInset = 24; // evita colar no topo/status bar
+
+                const visibleBottom = window.innerHeight - sheetHeight - sheetBottomOffset - sheetGap;
+                const availableHeight = Math.max(visibleBottom - topInset, 0);
+
+                const desiredTop = availableHeight >= rect.height
+                    ? topInset + (availableHeight - rect.height) / 2
+                    : topInset;
+
+                const absoluteElementTop = rect.top + window.scrollY;
+                const targetScrollY = Math.max(0, absoluteElementTop - desiredTop);
+                window.scrollTo({ top: targetScrollY, behavior: 'smooth' });
+            } else {
+                // Smooth scroll to element
+                element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+            }
         } else {
             // Target not found fallback
             setCoords({
@@ -52,7 +100,7 @@ export const InterfaceTour: React.FC<InterfaceTourProps> = ({ steps, isActive, c
                 height: 200
             });
         }
-    }, [currentStepIdx, steps]);
+    }, [currentStepIdx, steps, isMobile]);
 
     useEffect(() => {
         const handleResize = () => {
@@ -196,6 +244,7 @@ export const InterfaceTour: React.FC<InterfaceTourProps> = ({ steps, isActive, c
 
             {/* Glassmorphism Tooltip Card */}
             <div
+                ref={tooltipRef}
                 style={getTooltipStyle()}
                 className={`
                     pointer-events-auto 
