@@ -425,13 +425,6 @@ export default function App() {
 
   const getMonthKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 
-  // Helper to get previous month key for carry-over logic
-  const getPreviousMonthKey = (date: Date) => {
-    const prevDate = new Date(date);
-    prevDate.setMonth(date.getMonth() - 1);
-    return getMonthKey(prevDate);
-  };
-
   const currentMonthKey = getMonthKey(currentDate);
 
   // Datas de item gravadas a partir da chave antiga herdaram os espaços ('2026 -08 -01')
@@ -596,35 +589,6 @@ export default function App() {
     syncFromCloud(true);
   };
 
-  // Smart Month Logic: if current month data missing, clone previous month (keeping only recurring items)
-  const currentData = useMemo(() => {
-    if (allData[currentMonthKey]) {
-      return allData[currentMonthKey];
-    }
-
-    const prevKey = getPreviousMonthKey(currentDate);
-    if (allData[prevKey]) {
-      // Clone previous month structure
-      const newData = JSON.parse(JSON.stringify(allData[prevKey]));
-      // Reset non-recurring items to 0
-      Object.keys(newData).forEach(catKey => {
-        const category = newData[catKey as keyof FinancialData];
-        if (category && category.subCategories) {
-          category.subCategories.forEach((sub: any) => {
-            sub.items.forEach((item: any) => {
-              if (!item.isRecurring) {
-                item.value = 0;
-              }
-            });
-          });
-        }
-      });
-      return newData;
-    }
-
-    return JSON.parse(JSON.stringify(initialData));
-  }, [allData, currentMonthKey]);
-
   // Ao propagar, o item mantém o dia do mês original (vencimento do cartão, dia do
   // aluguel...), limitado ao último dia do mês de destino — dia 31 vira 30 em novembro.
   const shiftDateToMonth = (isoDate: string | undefined, monthKey: string) => {
@@ -641,6 +605,59 @@ export default function App() {
     const [toYear, toMonth] = toMonthKey.split('-').map(Number);
     return (toYear - fromYear) * 12 + (toMonth - fromMonth);
   };
+
+  // Smart Month Logic: if current month data missing, clone the most recent month
+  // with data (keeping only recurring items that haven't hit their limit yet).
+  const currentData = useMemo(() => {
+    if (allData[currentMonthKey]) {
+      return allData[currentMonthKey];
+    }
+
+    // Não usa só o mês imediatamente anterior: se o usuário pular meses (app
+    // fechado por um tempo, ou navegação direta para um mês distante), o mês
+    // anterior pode não existir em allData e a recorrência não pode se perder
+    // por causa disso. Busca o mês mais recente com dados, não importa a distância.
+    const priorKeys = Object.keys(allData).filter(k => k < currentMonthKey).sort();
+    const prevKey = priorKeys[priorKeys.length - 1];
+
+    if (prevKey) {
+      // Clone previous month structure
+      const newData = JSON.parse(JSON.stringify(allData[prevKey]));
+      Object.keys(newData).forEach(catKey => {
+        const category = newData[catKey as keyof FinancialData];
+        if (category && category.subCategories) {
+          category.subCategories.forEach((sub: any) => {
+            sub.items.forEach((item: any) => {
+              if (!item.isRecurring) {
+                item.value = 0;
+                return;
+              }
+
+              // Âncora da recorrência: recuada até o lançamento original, não o
+              // mês anterior — o limite de meses não pode reiniciar a cada clone.
+              const anchor: string | undefined = item.recurrenceStart || item.date;
+              if (item.recurrenceLimit && anchor &&
+                  monthsBetween(anchor.slice(0, 7), currentMonthKey) >= item.recurrenceLimit) {
+                // recorrência já cumpriu o número de meses contratado
+                item.isRecurring = false;
+                item.value = 0;
+                return;
+              }
+
+              // Novo mês, nova cobrança: não herda o "pago" do mês anterior, e o
+              // dia volta a ser o da âncora (dia 31 volta em dezembro após virar 30 em novembro).
+              item.isPaid = false;
+              item.date = shiftDateToMonth(anchor, currentMonthKey);
+              item.recurrenceStart = anchor;
+            });
+          });
+        }
+      });
+      return newData;
+    }
+
+    return JSON.parse(JSON.stringify(initialData));
+  }, [allData, currentMonthKey]);
 
   const propagateRecurringItemsToFuture = (sourceData: FinancialData, sourceMonthKey: string, fullData: { [key: string]: FinancialData }) => {
     const clonedData = { ...fullData, [sourceMonthKey]: sourceData };
